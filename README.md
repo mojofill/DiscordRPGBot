@@ -1,2 +1,2 @@
-# first_repo
-First try, is it possible?
+# Discord RPG storage for code
+This is only here to change between laptop
