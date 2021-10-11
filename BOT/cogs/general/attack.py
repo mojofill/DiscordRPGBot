@@ -269,7 +269,7 @@ class Attack(commands.Cog):
 
             # you can either find an alone monster, or a monster camp which basically works like a dungeon
             async def engageMonster(monster_type: str):
-                pass
+                await ctx.send('Please enter your first move.')
 
             spawnCoordX = random.randint(-500, 500)
             spawnCoordY = random.randint(-250, 250)
