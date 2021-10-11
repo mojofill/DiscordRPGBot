@@ -1,4 +1,5 @@
 import random
+import datetime
 import asyncio
 import discord
 import time
@@ -671,19 +672,109 @@ class Tools:
             return wpn_attack_times[wpn_name]
         
     def getMonsterFromPlayerLevel(self, level: int) -> str:
-        """Takes in the player level `level` and returns a random monster (`str` format) based on the user's level."""
-
-        # computer pick random number from 1 to 100
-        monsters = {
-            1:{
+        """Takes in the player level `level` and returns a random monster (`str` format) based on the user's level. Returns a tuple containing `base_monster` and `monster_rank`"""
+        
+        def getBaseMonsterType():
+            # computer pick random number from 1 to 1000
+            monsters = {
                 (1, 10):{ # players with levels 1 through 10 have these probability
+                    "mogosok":[0, 900],
+                    "jawsok":[900, 950],
+                    "drasok":[950, 990],
+                    "baursok":[990, 997],
+                    "bugosok":[997, 998],
+                    "gorsok":[998, 999]
+                },
+                (10, 20):{
+                    "mogosok":[0, 850],
+                    "jawsok":[850, 950],
+                    "drasok":[950, 990],
+                    "baursok":[990, 997],
+                    "bugosok":[997, 998],
+                    "gorsok":[998, 999]
+                },
+                (20, 30):{
+                    "mogosok":[0, 800],
+                    "jawsok":[800, 900],
+                    "drasok":[900, 985],
+                    "baursok":[985, 995],
+                    "bugosok":[995, 998],
+                    "gorsok":[998, 999]
+                },
+                (30, 40):{
+                    "mogosok":[0, 750],
+                    "jawsok":[750, 900],
+                    "drasok":[900, 985],
+                    "baursok":[985, 995],
+                    "bugosok":[995, 998],
+                    "gorsok":[998, 999]
+                },
+                (40, 50):{
+                    "mogosok":[0, 700],
+                    "jawsok":[700, 800],
+                    "drasok":[800, 900],
+                    "baursok":[900, 950],
+                    "bugosok":[950, 990],
+                    "gorsok":[990, 999]
+                },
+                (50, 60):{
+                    "mogosok":[0, 650],
+                    "jawsok":[650, 800],
+                    "drasok":[800, 900],
+                    "baursok":[900, 950],
+                    "bugosok":[950, 990],
+                    "gorsok":[990, 999]
                     
                 }
             }
-        }
+
+            number = random.randint(0, 999)
+            
+            for lvl_range in monsters:
+                if level in range(lvl_range[0], lvl_range[1]):
+                    for monster in monsters[level]:
+                        monster_probability = monsters[level][monster]
+
+                        if number in range(monster_probability[0], monster_probability[1]):
+                            return monster # returns the base monster from above
+        
+        base_monster = getBaseMonsterType()
+
+        def getMonsterRankFromBaseMonsterAndLevel():
+            """Returns the monster rank based on the user's level and the base monster type"""
+            specific_monster_from_base_monster = { # this is still based on the user level
+                (1, 20):{
+                    "mogosok":{ # for users level 1 through 20 the mogosoks are either rank 1 or 2
+                        1:[1, 990],
+                        2:[990, 999]
+                    }
+                },
+                (20, 50):{
+                    # finish this shit
+                }
+            }
+
+            x = random.randint(0, 999)
+
+            for level_range in specific_monster_from_base_monster:
+                if level in range(level_range[0], level_range[1]):
+                    monster_ranks_from_base_monster: dict = specific_monster_from_base_monster[level_range][base_monster] # this contains the monster ranks from base_monster
+
+                    for monster_rank in monster_ranks_from_base_monster:
+                        if x in range(monster_ranks_from_base_monster[monster_rank][0], monster_ranks_from_base_monster[monster_rank][1]):
+                            return monster_rank
+        
+        monster_rank = getMonsterRankFromBaseMonsterAndLevel()
+
+        return base_monster, monster_rank
     
-    async def spawnMonster(self, ctx: commands.Context, user: discord.User, monster_type: str, monster_rank: int) -> dict:
-        """Method spawns a monster. User can either choose to engage the monster, or on rare occasions the monster will come towards to user."""
+    async def spawnMonster(self, ctx: commands.Context, client: commands.Bot, user: discord.User, monster_type: str, monster_rank: int) -> bool:
+        """Method spawns a monster. User can either choose to engage the monster, or on rare occasions the monster will come towards to user. Returns `True` if the monster spawn worked, `False` if not (the user might have declined)"""
+        
+        """
+            monster_type = name of monster
+            monster_rank = the ranking of the monster in the monster hierarchy
+        """
 
         def getMonster():
             def getWpnData(base_wpn_name: str) -> tuple:
@@ -709,7 +800,7 @@ class Tools:
                             1:[10,20],
                             2:[20,30],
                             3:[30,45],
-                            4:[45,55],
+                            4:[45,55] 
                         },
                         "damage":{
                             1:[3,9],
@@ -935,36 +1026,91 @@ class Tools:
                 }
 
             if monster_attack_type == 'melee':
-                equipment_name = 'weapon'
+                equipment_type = 'weapon'
             
             else:
-                equipment_name = 'bow'
+                equipment_type = 'bow'
 
             new_monster_data = {
+                "name":monster_type,
                 "health":monster_health,
                 "attack type":monster_attack_type,
-                equipment_name:{
+                equipment_type:{
                     "name":name,
                     "durability":durability,
                     "damage":damage,
                     "attack time":attack_time
                 },
-                "shield":shield_data
+                "shield":shield_data,
+                "equipment type":equipment_type
             }
             
             return new_monster_data # returns the entire data for the monster
         
         monster_data = getMonster()
 
-        await ctx.send(embed=discord.Embed(
-            title='Monster Found'
-        ))
+        base_monster = monster_data["name"]
+        health = monster_data["health"]
+        attack_type = monster_data["attack type"] # this is either `bow` or `melee`
+        equipment_type = monster_data["equipment type"] # this is either `bow` or `weapon`
+
+        equipment_data = monster_data[equipment_type] # contains: name, durability, damage, and attack time of the equipment the monster is using.
+
+        shield_name = monster_data["shield"] if monster_data["shield"] != None else None
+
+        await ctx.send(f"{user.mention} you have found a **{base_monster}**! Enter `.more` to find out more about this monster. React with 🇾 to engage with the {base_monster}, 🇳 to pass. Message will timeout in 60 seconds.")
+
+        em = discord.Embed(
+            title='Monster Found!',
+            description='Stay alert...',
+            timestamp=datetime.datetime.utcnow()
+        )
+
+        em.add_field(name="Monster Data", value=f"""
+            Monster Type: {base_monster}
+            Attack Type: {attack_type}
+            Equipment: {equipment_type}
+            Equipment name: {equipment_data["name"]}
+            Shield: {shield_name}
+        """)
+
+        em.set_author(name=user, icon_url=user.avatar_url)
+        em.set_footer(text='You can use the Thokim Epitome gifted by the Mages to find out more about a monster by `.more <object name>`. For example, `.more mogosok`.')
+        
+        await ctx.send(embed=em)
+
+        if random.randint(1, 100) == 1: # monster has chosen to attack the user
+            await ctx.send(f'{user.mention} Watch out! A {base_monster} has decided to attack you!')
+        
+        else:
+            ans = None
+            
+            def check(reaction: discord.Reaction, user_: discord.User):
+                if reaction.emoji in ['🇾','🇳'] and user_.id == user:
+                    ans = reaction.emoji # save the reaction emoji
+                
+                    return True
+                
+                return False
+            
+            try:
+                await client.wait_for("reaction_add", check=check, timeout=60.0)
+            
+            except asyncio.TimeoutError:
+                await ctx.send(f'{user.mention} you have timed out ❌')
+            
+            if ans == '🇾':
+                await ctx.send('please let this work')
+                await self.startMonsterAttackLoop(ctx, user, monster_data)
+        
+            else: # user has passed
+                return False
 
     async def startMonsterAttackLoop(self, ctx: commands.Context, user: discord.User, monster_data: dict):
-        """This only starts the MONSTER attacking the user - does not take in notice of the USER sending in commands from discord."""
+        """`monster_data` should be the return value of `spawnMonster`."""
 
         class Monster:
-            def __init__(self, enemy: discord.User, *, name: str, wpn: dict = None, bow:str=None, shield: dict = None):
+            def __init__(self, enemy: discord.User, *, name: str, wpn: dict = None, bow: str = None, shield: dict = None, attack_wait: int):
                 self.name = name
                 self.wpn = wpn
                 self.bow = bow
@@ -979,37 +1125,76 @@ class Tools:
                 
                 hp = user_data["healthpoints"]
 
-                open_attack_chance = False # if this is set True then that means the AI thinks that this is a good time to fight the user, because his armor either broke or he is knocked down
+                open_attack_chance = False # if this is set True then that means the AI thinks that this is a good time to fight the player, because his armor either broke or he is knocked down
                 
-                @tasks.loop()
-                async def loop(seconds=0.5):
-                    if open_attack_chance:
+                fightBool = False # if this becomes false then we stop the loop
+
+                def getVerbOfWeaponName(weapon_name: str):
+                    """Returns the past tense verb that goes with the weapon name"""
+                    base_weapon_name = weapon_name.split(' ')[1]
+
+                    verb_from_weapon = {
+                        "club":"struck"
+                    }
+
+                    return verb_from_weapon[base_weapon_name]
+
+                while fightBool:
+                    if open_attack_chance: # this means the monster has decided to attack the user
                         """Code here will deal the actual damage to the user"""
                         try:
-                            hp["health"] -= self.wpn["damage"]
+                            weapon_name: str = self.wpn["name"]
+                            weapon_damage: int = self.wpn["damage"]
 
-                        except TypeError: # meaning wpn was None and is not "subscriptable" - cannot access keys of wpn because its not a dict
+                            weapon_damage = tools.process_all_damage_reduce(user, weapon_damage)
+
+                            hp["health"] -= weapon_damage
+
+                            verb = getVerbOfWeaponName(weapon_name)
+
+                            em = discord.Embed(
+                                description=f'A {self.name} used its {weapon_name} and {verb} {user.mention}, dealing **{weapon_damage}**.'
+                            )
+
+                            em.add_field(name='\u200b', value=f"""
+                                Remaining health: {hp["health"]}
+                            """)
+                            
+                            await ctx.send(embed=em)
+
+                        except TypeError: # meaning wpn was None (meaning the equipment the monster has is a bow) and is not "subscriptable" - cannot access keys of wpn because its not a dict
                             hp["health"] -= self.bow["damage"]
                     
                     else:
-                        """Code here will decide whether to wait for an opening, randomly try to attack or run away"""
-                
-                loop.start()
-        
-        monster_name = monster_data["name"]
+                        """Code here will decide whether to wait for an opening, randomly (read = stupidly) try to attack or run away (this is only if the user has not attacked and only retreated for a duration of time."""
+                        
+                        # how i think it should work:
+                        # the monster usually waits for 3 seconds and if the user has not done anything it will attack
+                        # other times it will be stupid and charge the player
+                        # sometimes it will charge attack, but depending on the monster type the chances of charge attack will vary
 
-        monster_attack_type = monster_data["attack type"]
-        
-        monster_shield = monster_data["shield"]
+                        # decide whether to wait or be stupid
+                        number = random.randint(1, 9)
 
-        if monster_attack_type == 'melee':
+                        if number == 1: # just start attacking the user without waiting
+                            open_attack_chance = True
+                            
+                            await asyncio.sleep(1) # at least sleep 1 second to give the user time to think and prepare
+        
+        name = monster_data["name"]
+        attack_type = monster_data["attack type"]
+        equipment_type = monster_data["equipment type"]
+        shield = monster_data["shield"]
+        attack_wait = monster_data[equipment_type]["attack wait"]
+
+        if attack_type == 'melee':
             print('code has reached here')
             monster_wpn = monster_data["weapon"]
-            monster = Monster(user, name=monster_name, wpn=monster_wpn, sheild=monster_shield)
+            monster = Monster(user, name=name, wpn=monster_wpn, sheild=shield, attack_wait=attack_wait)
         
         else:
             monster_bow = monster_data["bow"]
-            monster = Monster(user, name=monster_name, bow=monster_bow, shield=monster_shield)
+            monster = Monster(user, name=name, bow=monster_bow, shield=shield, attack_wait=attack_wait)
 
         # starts the actual monster attack loop
         await monster.startAttackLoop()
@@ -1437,6 +1622,7 @@ class Tools:
         return final_damage
         
     def process_all_damage_reduce(self,user:discord.User,damage) -> float:
+        """Returns the final damage of after processing the damage taken away from damage reduction (armor)"""
         hp = db.healthpoints.find_one({"_id":user.id})
 
         final_reduce = 0

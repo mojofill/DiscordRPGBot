@@ -207,6 +207,8 @@ class Attack(commands.Cog):
             await m.remove_reaction(emoji, user)
         
             await ctx.send(f'{user.mention} You have selected {target}')
+
+        user_data = Database.getStorageData(user)
         
         if target == 'monster':
             """Start monster loop"""
@@ -221,33 +223,55 @@ class Attack(commands.Cog):
             iter_x_add = 1
             iter_y_add = 1
 
+            foundUp = False
+            foundDown = False
+            foundRight = False
+            foundLeft = False
+
+            borders_found = 0
+
             while True:
                 coords = []
                 
-                up = (x, y + iter_y_add)
-                down = (x, y - iter_y_add)
-                right = (x + iter_x_add, y)
-                left = (x - iter_x_add, y)
-
-                coords.extend([up, down, right, left])
+                if not foundUp:
+                    up = (x, y + iter_y_add)
+                    coords.append(up)
+                if not foundDown:
+                    down = (x, y - iter_y_add)
+                    coords.append(down)
+                if not foundRight:
+                    right = (x + iter_x_add, y)
+                    coords.append(right)
+                if not foundLeft:
+                    left = (x - iter_x_add, y)
+                    coords.append(left)
                 
                 borders = []
 
-                number_of_borders = 0
+                bool_to_coord_direction = {
+                    up:foundUp,
+                    down:foundDown,
+                    left:foundLeft,
+                    right:foundRight
+                }
 
                 for coord in coords: # go through each coord and check if one is a border
                     try:
                         block = Map.Thokim[coord]
 
-                        if block[0] == 'b':
+                        if block[0] == 'b': # each block begins with a b or m, signifying border or monster respectively
                             borders.append(block[2:])
 
-                        number_of_borders += 1
+                            await ctx.send(f'found a border block: {coord} = {block[2::]}')
+
+                            borders_found += 1
+
+                            bool_to_coord_direction[coord] = True # set the bool for the given coord as True as to not try and find more
                     
                     except KeyError:
                         pass
                 
-                if number_of_borders == 4:
+                if borders_found == 4:
                     break
 
             environment = None # environment the user spawns in - currently None
@@ -268,8 +292,8 @@ class Attack(commands.Cog):
                 await ctx.send(f"{user.mention} Entered hunting loop! You have spawned in the {environment[2:]}")
 
             # you can either find an alone monster, or a monster camp which basically works like a dungeon
-            async def engageMonster(monster_type: str):
-                await ctx.send('Please enter your first move.')
+            async def engageMonster(monster_type: str) -> None:
+                pass
 
             spawnCoordX = random.randint(-500, 500)
             spawnCoordY = random.randint(-250, 250)
@@ -290,18 +314,29 @@ class Attack(commands.Cog):
                         pass
                 
                     else: # RNG says that the user can only fight a singular monster
-                        await tools.spawnMonster(ctx, user)
+                        gdata = user_data["game"]
+                        
+                        base_monster, monster_rank = tools.getMonsterFromPlayerLevel(gdata["level"])
+                        
+                        monster = await tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank) # will spawn a monster, ask user is they want to engage it, and start the fight between the user and the monster if yes or the monster decides to engage
 
-                    while True: # while loop for ONE of the next coords
-                        x = random.randint(current_cord[0] - radius, current_cord[0] + radius)
-                        y = random.randint(current_cord[1] - radius, current_cord[1] + radius)
-                    
-                        if abs(x - current_cord[0]) + abs(y - current_cord[1]) <= radius:
-                            current_cord = (x, y)
-                            break
+                        await ctx.send(f'your current coordinate is {current_cord}')
+
+                        def check(reaction, user):
+                            return True
+
+                        await self.client.wait_for("reaction_add", check=check)
                     
                 else: # user did not find a monster. i can choose to put something here if i want
                     pass
+            
+                while True: # while loop for ONE of the next coords
+                    x = random.randint(current_cord[0] - radius, current_cord[0] + radius)
+                    y = random.randint(current_cord[1] - radius, current_cord[1] + radius)
+                
+                    if abs(x - current_cord[0]) + abs(y - current_cord[1]) <= radius:
+                        current_cord = (x, y)
+                        break
         
         elif target == 'prey':
             """Start prey loop"""
