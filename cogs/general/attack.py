@@ -255,6 +255,22 @@ class Attack(commands.Cog):
                     right:foundRight
                 }
 
+                def check(m: discord.Message):
+                    return m.author.id == user.id
+                
+                await ctx.send(f'''
+                    right now, the coordinates the bot is on are:
+                    Up: `{up}`
+                    Down: `{down}`
+                    Left: `{left}`
+                    Right: `{right}`
+
+                    Currently, `{borders_found}` have been found, and they are **{','.join(borders)}**
+                ''')
+
+                # pause and wait for the me to know what is happening
+                await self.client.wait_for("message", check=check)
+
                 for coord in coords: # go through each coord and check if one is a border
                     try:
                         block = Map.Thokim[coord]
