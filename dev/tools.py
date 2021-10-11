@@ -666,7 +666,9 @@ class Tools:
         
         else:
             wpn_attack_times = {
-                "mogo club":0.5 # we can change this later on
+                "mogo club":0.5, # we can change this later on
+                "mogo spear":0.3,
+                "mogo bow":1.5
             }
 
             return wpn_attack_times[wpn_name]
@@ -732,8 +734,8 @@ class Tools:
             
             for lvl_range in monsters:
                 if level in range(lvl_range[0], lvl_range[1]):
-                    for monster in monsters[level]:
-                        monster_probability = monsters[level][monster]
+                    for monster in monsters[lvl_range]:
+                        monster_probability = monsters[lvl_range][monster]
 
                         if number in range(monster_probability[0], monster_probability[1]):
                             return monster # returns the base monster from above
@@ -996,12 +998,12 @@ class Tools:
                         break
             
                 if monster_attack_type == 'melee':
-                    equipment_durability, equipment_damage, base_equipment_name, new_equipment_name = getWpnData(equipment_name)
+                    equipment_durability, equipment_damage, new_equipment_name = getWpnData(equipment_name)
                 
                 else:
-                    equipment_durability, equipment_damage, base_equipment_name, new_equipment_name = getBowData(equipment_name)
+                    equipment_durability, equipment_damage, new_equipment_name = getBowData(equipment_name)
                 
-                return equipment_durability, equipment_damage, base_equipment_name, new_equipment_name, monster_attack_type
+                return equipment_durability, equipment_damage, equipment_name, new_equipment_name, monster_attack_type
 
             # code below gets the monster data
             monster_health = getMonsterHealth()
@@ -1010,7 +1012,7 @@ class Tools:
             shield_durability, shield_knockback, shield_name = getShieldData()
 
             if monster_attack_type == 'bow':
-                attack_time = self.getEquipmentAttackTime(base_equipment_name)
+                attack_time = self.getEquipmentAttackTime(base_equipment_name, name)
             
             else:
                 attack_time = self.getEquipmentAttackTime(base_equipment_name, name)
@@ -1058,7 +1060,10 @@ class Tools:
 
         shield_name = monster_data["shield"] if monster_data["shield"] != None else None
 
-        await ctx.send(f"{user.mention} you have found a **{base_monster}**! Enter `.more` to find out more about this monster. React with 🇾 to engage with the {base_monster}, 🇳 to pass. Message will timeout in 60 seconds.")
+        m: discord.Message = await ctx.send(f"{user.mention} you have found a **{base_monster}**! Enter `.more` to find out more about this monster. React with 🇾 to engage with the {base_monster}, 🇳 to pass. Message will timeout in 60 seconds.")
+
+        await m.add_reaction('🇾')
+        await m.add_reaction('🇳')
 
         em = discord.Embed(
             title='Monster Found!',
@@ -1086,7 +1091,9 @@ class Tools:
             ans = None
             
             def check(reaction: discord.Reaction, user_: discord.User):
-                if reaction.emoji in ['🇾','🇳'] and user_.id == user:
+                nonlocal ans
+
+                if reaction.emoji in ['🇾','🇳'] and user_.id == user and reaction.message.id == m.id:
                     ans = reaction.emoji # save the reaction emoji
                 
                     return True

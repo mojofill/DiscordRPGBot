@@ -115,7 +115,7 @@ def getThokimMap():
             return points
 
         thokim_town_origin = (333, 0)
-        thokim_base_map[thokim_town_origin] = "b|thokim-town"
+        thokim_base_map[thokim_town_origin] = "u|thokim-town"
 
         # 333 block radius around the thokim_town_origin
         thokim_town_radius = 80
@@ -127,7 +127,7 @@ def getThokimMap():
         )
 
         for coord in thokim_town_points:
-            thokim_base_map[coord] = "b|thokim-town"
+            thokim_base_map[coord] = "u|thokim-town"
 
     def setThokimDesert():
         x = -250

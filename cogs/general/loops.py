@@ -16,7 +16,6 @@ class Loops(commands.Cog):
         self.daily_shipments.start()
         self.weekly_shipments.start()
         self.give_credits.start()
-        self.remind.start()
         print('Loops extension ready. ')
 
         self.items = {
@@ -179,19 +178,6 @@ class Loops(commands.Cog):
     @tasks.loop(seconds=86400)
     async def give_credits(self):
         pass
-
-    @tasks.loop(minutes=5)
-    async def remind(self):
-        with open('remind.json','r') as f:
-            data = json.load(f)
-        
-        channel = self.client.get_channel(831328815988604949)
-
-        if data["message"] == None:
-            await channel.send('No information yet.')
-        
-        else:
-            await channel.send(data["message"])
 
     @tasks.loop(seconds=86400) # 86400 seconds in a day
     async def change_daily_quests(self):

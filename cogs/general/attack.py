@@ -220,8 +220,13 @@ class Attack(commands.Cog):
             x = random.randint(-500, 500) # spawning point of user - x
             y = random.randint(-250, 250) # spawning point of user - y
 
+            spawnCoordX = x
+            spawnCoordY = y
+
             iter_x_add = 1
             iter_y_add = 1
+            iter_x_subtract = 1
+            iter_y_subtract = 1
 
             foundUp = False
             foundDown = False
@@ -230,23 +235,30 @@ class Attack(commands.Cog):
 
             borders_found = 0
 
-            while True:
-                coords = []
+            borders = []
+
+            while True: # there can only be 4 borders
+                coords = [] # contains COORDINATES
                 
                 if not foundUp:
                     up = (x, y + iter_y_add)
+                    iter_y_add += 1
                     coords.append(up)
+
                 if not foundDown:
                     down = (x, y - iter_y_add)
+                    iter_y_subtract += 1
                     coords.append(down)
+
                 if not foundRight:
                     right = (x + iter_x_add, y)
+                    iter_x_add += 1
                     coords.append(right)
+
                 if not foundLeft:
                     left = (x - iter_x_add, y)
+                    iter_x_subtract += 1
                     coords.append(left)
-                
-                borders = []
 
                 bool_to_coord_direction = {
                     up:foundUp,
@@ -257,19 +269,6 @@ class Attack(commands.Cog):
 
                 def check(m: discord.Message):
                     return m.author.id == user.id
-                
-                await ctx.send(f'''
-                    right now, the coordinates the bot is on are:
-                    Up: `{up}`
-                    Down: `{down}`
-                    Left: `{left}`
-                    Right: `{right}`
-
-                    Currently, `{borders_found}` have been found, and they are **{','.join(borders)}**
-                ''')
-
-                # pause and wait for the me to know what is happening
-                await self.client.wait_for("message", check=check)
 
                 for coord in coords: # go through each coord and check if one is a border
                     try:
@@ -280,26 +279,34 @@ class Attack(commands.Cog):
 
                             await ctx.send(f'found a border block: {coord} = {block[2::]}')
 
+                            # await self.client.wait_for("message",check=check)
+
                             borders_found += 1
 
                             bool_to_coord_direction[coord] = True # set the bool for the given coord as True as to not try and find more
                     
                     except KeyError:
-                        pass
+                        pass # meaning the coordinate is not in the Thokim Map
                 
                 if borders_found == 4:
                     break
 
             environment = None # environment the user spawns in - currently None
-            prev_border = coords[0] # first border in the coords
+            first_border = borders[0] # first border COORDINATE in the coords
+
+            await ctx.send(f"These are your borders: {borders}")
             
-            for border in borders[1::]: # get the rest of the borders besides to first one to save time
-                if border == 'map-border' or border != prev_border: # if any of the borders do not match the previous one then that means the user spawned in open space
+            for border in borders[1:]: # get the rest of the borders besides to first one to save time
+                await ctx.send(f'iterated onto border {border}')
+                if border == 'map-border' or border != first_border: # if any of the borders do not match the previous one then that means the user spawned in open space
+                    await ctx.send('set the environment to open space')
                     environment = 'open space' # set environment to open space
                     break
             
             if environment == None: # this means that all 4 borders were the same AND no border was a map border
-                environment = prev_border # set environment to prev_border because all the borders are the same prev border is just the last one we iterated on and its saved
+                environment = first_border # set environment to first border because all the borders are the same prev border is just the last one we iterated on and its saved
+            
+            await ctx.send(f"This is your environment: {environment}")
             
             if environment == 'open space': # grasslands
                 await ctx.send(f"{user.mention} Entered hunting loop! You have spawned in the grasslands.")
