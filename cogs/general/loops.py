@@ -207,9 +207,9 @@ class Loops(commands.Cog):
                 for i in range(quests_to_give):
                     quest_name = random.choice(quest_choices_name)
 
-                    equiped_quest_index = quest_choices_name.index(quest_name)
+                    equipped_quest_index = quest_choices_name.index(quest_name)
 
-                    quest = quest_choices_values[equiped_quest_index]
+                    quest = quest_choices_values[equipped_quest_index]
 
                     limit = quest["limit"]
 

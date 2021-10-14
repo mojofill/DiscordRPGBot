@@ -74,12 +74,12 @@ class Attack(commands.Cog):
 
         for wpn in bp["weapons"]:
             if bp["weapons"][wpn]["name"] == wpn_name:
-                # update in the user's document in backpack collection with equiped weapon as the weapon argument
+                # update in the user's document in backpack collection with equipped weapon as the weapon argument
 
-                user_data["backpack"]["equiped weapon"] = wpn_name
+                user_data["backpack"]["equipped weapon"] = wpn_name
         
                 em = discord.Embed(
-                    description=f'You have equiped `{wpn_name}`'
+                    description=f'You have equipped `{wpn_name}`'
                 )
 
                 await ctx.send(embed=em)
@@ -132,13 +132,13 @@ class Attack(commands.Cog):
         bp = user_data["backpack"]
         
         if wpn_name != bp["selected weapon"]:
-            await ctx.send(f'You do not have {wpn_name} equiped right now - the weapon that you have equiped is {bp["selected weapon"]}')
+            await ctx.send(f'You do not have {wpn_name} equipped right now - the weapon that you have equipped is {bp["selected weapon"]}')
             return
         
         bp["equipped weapon"] = wpn_name
 
         em = discord.Embed(
-            description=f'Unequiped `weapon-type: {bp["weapons"][wpn_name]["type"]}`, `name: {wpn_name}`'
+            description=f'Unequipped `weapon-type: {bp["weapons"][wpn_name]["type"]}`, `name: {wpn_name}`'
         )
 
         await ctx.send(embed=em)
@@ -159,7 +159,7 @@ class Attack(commands.Cog):
             )
 
             em.add_field(name='React with one of the following to hunt', value="""
-                Monsters: ✊
+                Monsters: 👊
                 Falcon: 🐦
                 Prey: 🍖
             """)
@@ -168,7 +168,7 @@ class Attack(commands.Cog):
 
             m: discord.Message = await ctx.send(embed=em)
 
-            await m.add_reaction('✊')
+            await m.add_reaction('👊')
             await m.add_reaction('🐦')
             await m.add_reaction('🍖')
             
@@ -178,7 +178,7 @@ class Attack(commands.Cog):
                 nonlocal emoji
                 
                 if _user.id == user.id :
-                    for emoji_ in ['✊','🐦','🍖']:
+                    for emoji_ in ['👊','🐦','🍖']:
                         if reaction.emoji == emoji_:
                             emoji = emoji_
 
@@ -195,7 +195,7 @@ class Attack(commands.Cog):
             
             target = None
             
-            if emoji == '✊':
+            if emoji == '👊':
                 target = 'monster'
             
             elif emoji == '🐦':
@@ -277,8 +277,6 @@ class Attack(commands.Cog):
                         if block[0] == 'b': # each block begins with a b or m, signifying border or monster respectively
                             borders.append(block[2:])
 
-                            await ctx.send(f'found a border block: {coord} = {block[2::]}')
-
                             # await self.client.wait_for("message",check=check)
 
                             borders_found += 1
@@ -293,20 +291,14 @@ class Attack(commands.Cog):
 
             environment = None # environment the user spawns in - currently None
             first_border = borders[0] # first border COORDINATE in the coords
-
-            await ctx.send(f"These are your borders: {borders}")
             
             for border in borders[1:]: # get the rest of the borders besides to first one to save time
-                await ctx.send(f'iterated onto border {border}')
                 if border == 'map-border' or border != first_border: # if any of the borders do not match the previous one then that means the user spawned in open space
-                    await ctx.send('set the environment to open space')
                     environment = 'open space' # set environment to open space
                     break
             
             if environment == None: # this means that all 4 borders were the same AND no border was a map border
                 environment = first_border # set environment to first border because all the borders are the same prev border is just the last one we iterated on and its saved
-            
-            await ctx.send(f"This is your environment: {environment}")
             
             if environment == 'open space': # grasslands
                 await ctx.send(f"{user.mention} Entered hunting loop! You have spawned in the grasslands.")
@@ -338,17 +330,23 @@ class Attack(commands.Cog):
                 
                     else: # RNG says that the user can only fight a singular monster
                         gdata = user_data["game"]
-                        
+
                         base_monster, monster_rank = tools.getMonsterFromPlayerLevel(gdata["level"])
                         
-                        monster = await tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank) # will spawn a monster, ask user is they want to engage it, and start the fight between the user and the monster if yes or the monster decides to engage
+                        res: bool or dict = await tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank) # will spawn a monster, ask user is they want to engage it, and start the fight between the user and the monster if yes or the monster decides to engage
 
-                        await ctx.send(f'your current coordinate is {current_cord}')
+                        if res == False: # this means that the user does not want to engage with this monster
+                            pass
+                    
+                        else: # the user has decided fuck yeah lets kill this damn monster
+                            await ctx.send(f'your current coordinate is {current_cord}')
 
-                        def check(reaction, user):
-                            return True
+                            # now we can start accepting user commands
 
-                        await self.client.wait_for("reaction_add", check=check)
+                            monster_data: dict = res
+                            # make an object that is not hidden in tools.py to reference to
+
+                            await tools.startMonsterAttackLoop(ctx, user, monster_data)
                     
                 else: # user did not find a monster. i can choose to put something here if i want
                     pass

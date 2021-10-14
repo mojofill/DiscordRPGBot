@@ -509,7 +509,7 @@ class Weather(commands.Cog):
                 "thunderstorm":{
                     "can transform":True,
                     "transformation":{
-                        (0,1):"flood" # 1 out of 50 thunderstorms cause a complete flood for 10 minutes, making the user unable to travel anywhere on foot, can only rely on falcon for flying and the train. if the user tries to go anywhere during a flood, game will warn user to not outisde ONCE, and if the user keeps trying to then INSTANT DEATH. Just like a hurricane, except there will be no possibility of losing your equiped weapon
+                        (0,1):"flood" # 1 out of 50 thunderstorms cause a complete flood for 10 minutes, making the user unable to travel anywhere on foot, can only rely on falcon for flying and the train. if the user tries to go anywhere during a flood, game will warn user to not outisde ONCE, and if the user keeps trying to then INSTANT DEATH. Just like a hurricane, except there will be no possibility of losing your equipped weapon
                     },
                     "risk type":["chance"],
                     # thunderstorms should be more likely to hit a person in the jungle and desert
@@ -577,7 +577,7 @@ class Weather(commands.Cog):
                     # as soon as you fall into the hurricane youre dead, drowned
                     "extra":{
                         "lose weapon range":[0,1],
-                        "number range":[1,10] # 1 out of 10 people that are washed away will also lose their equiped weapon when they respawn
+                        "number range":[1,10] # 1 out of 10 people that are washed away will also lose their equipped weapon when they respawn
                     }
                 },
                 "flood":{
