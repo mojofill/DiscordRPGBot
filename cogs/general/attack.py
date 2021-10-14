@@ -74,12 +74,12 @@ class Attack(commands.Cog):
 
         for wpn in bp["weapons"]:
             if bp["weapons"][wpn]["name"] == wpn_name:
-                # update in the user's document in backpack collection with equiped weapon as the weapon argument
+                # update in the user's document in backpack collection with equipped weapon as the weapon argument
 
-                user_data["backpack"]["equiped weapon"] = wpn_name
+                user_data["backpack"]["equipped weapon"] = wpn_name
         
                 em = discord.Embed(
-                    description=f'You have equiped `{wpn_name}`'
+                    description=f'You have equipped `{wpn_name}`'
                 )
 
                 await ctx.send(embed=em)
@@ -132,13 +132,13 @@ class Attack(commands.Cog):
         bp = user_data["backpack"]
         
         if wpn_name != bp["selected weapon"]:
-            await ctx.send(f'You do not have {wpn_name} equiped right now - the weapon that you have equiped is {bp["selected weapon"]}')
+            await ctx.send(f'You do not have {wpn_name} equipped right now - the weapon that you have equipped is {bp["selected weapon"]}')
             return
         
         bp["equipped weapon"] = wpn_name
 
         em = discord.Embed(
-            description=f'Unequiped `weapon-type: {bp["weapons"][wpn_name]["type"]}`, `name: {wpn_name}`'
+            description=f'Unequipped `weapon-type: {bp["weapons"][wpn_name]["type"]}`, `name: {wpn_name}`'
         )
 
         await ctx.send(embed=em)
@@ -346,11 +346,7 @@ class Attack(commands.Cog):
                             monster_data: dict = res
                             # make an object that is not hidden in tools.py to reference to
 
-                            try:
-                                await tools.startMonsterAttackLoop(ctx, user, monster_data)
-                            
-                            except:
-                                pass
+                            await tools.startMonsterAttackLoop(ctx, user, monster_data)
                     
                 else: # user did not find a monster. i can choose to put something here if i want
                     pass

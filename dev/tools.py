@@ -793,6 +793,65 @@ class Tools:
     async def startMonsterAttackLoop(self, ctx: commands.Context, user: discord.User, monster_data: dict):
         """`monster_data` should be the return value of `spawnMonster`."""
 
+        class PlayerInAttack(Exception): # error class
+            """Error gets raised if the user tries to attack but is currently still in attack"""
+
+        class _Player:
+            def __init__(self):
+                user_data = Database.getStorageData(user)
+                gdata = user_data["game"]
+
+                self.energy_depleted = True if gdata["energy"] == 0 else False
+
+                hp = user_data["healthpoints"]
+                bp = user_data["backpack"]
+
+                self.health = hp["health"]
+
+                wpn = None if bp["weapons"]["equipped weapon"] == None else bp["weapons"]["equipped weapon"]
+                bow = None if bp["bows"]["bow"] == None else bp["bows"]["bow"]
+
+                self.wpn = None
+                self.bow = None
+
+                if not wpn == None:
+                    self.wpn = bp["weapons"][wpn]
+                
+                if not bow == None:
+                    self.bow = bp["bows"][bow]
+
+                self.attack_wait = self.wpn["attack time"] if not self.wpn == None else self.bow["attack time"]
+
+                self.in_attack = False # if True then the user cannot do anything until False again
+            
+            async def attackWpn(self):
+                """Take away energy taken per attack. also set `self.in_attack` equal to `True`, `awit asyncio.sleep(self.attack_wait)`"""
+
+                if self.in_attack:
+                    raise PlayerInAttack()
+
+                self.in_attack = True
+
+                await asyncio.sleep(self.attack_wait)
+
+                user_data = Database.getStorageData(user)
+
+                bp = user_data["backpack"]
+                
+                self.wpn[""]
+                
+                self.in_attack = False
+
+            async def shoowBow(self):
+                if self.in_attack:
+                    raise PlayerInAttack()
+                
+                self.in_attack
+
+                await asyncio.sleep(self.attack_wait)
+
+        player = _Player()
+
         class Monster:
             def __init__(self, enemy: discord.User, *, name: str, wpn: dict = None, bow: str = None, shield: dict = None, attack_wait: int):
                 self.name = name
@@ -800,6 +859,7 @@ class Tools:
                 self.bow = bow
                 self.shield = shield
                 self.enemy = enemy
+                self.attack_wait = attack_wait
             
             async def startAttackLoop(self):
                 """Asyncronous method will starting asyncio loop that will get the monster to start attacking the user."""
@@ -864,6 +924,10 @@ class Tools:
                             open_attack_chance = True
                             
                             await asyncio.sleep(1) # at least sleep 1 second to give the user time to think and prepare
+                        
+                        else:
+                            """Take in data from player object """
+                            pass
         
         name = monster_data["name"]
         attack_type = monster_data["attack type"]
@@ -1217,7 +1281,7 @@ class Tools:
         """)
 
         em.set_author(name=user, icon_url=user.avatar_url)
-        em.set_footer(text='You can use the Thokim Epitome gifted by the Mages to find out more about a monster by `.more <object name>`. For example, `.more mogosok`.')
+        em.add_field(name="\u200b",value='You can use the Thokim Epitome gifted by the Mages to find out more about a monster by `.more <object name>`. For example, `.more mogosok`.')
         
         await ctx.send(embed=em)
 
@@ -1291,7 +1355,7 @@ class Tools:
             Going out in this weather will always try cause some kind of damage to you, whether you like it or not. However, if you have special equipment, for example a boat for transportation in floods, or strong armor to reduce incoming damage (and if possible, a speed boosting potion to get to where you need faster.)
 
             1. Hurricane
-                There is nothing special about a hurricane, except there is a possibility of losing your equiped weapon
+                There is nothing special about a hurricane, except there is a possibility of losing your equipped weapon
 
         Chance:
             Weather that have chance as one of its risk types means that everytime a user goes out, there will be a chance the user will get some kind of damage. Not always, if the user is lucky.
@@ -1387,7 +1451,7 @@ class Tools:
                     tornado_loop.start()
             
                 elif weather["weather"] == 'flood':
-                    # isntant death, just like a hurricane, but there is no possibility of losing your equiped weapon.
+                    # isntant death, just like a hurricane, but there is no possibility of losing your equipped weapon.
                     final_embed.add_field(name='Death',value=self.death_message(user,death_type="weather",weather_type="flood"))
 
                 # and thats really about it for the direct cause weather risk type
@@ -1682,7 +1746,7 @@ class Tools:
         for armor in hp["armor"]:
             # go through all the armor in the user's hp (what the user is wearing right now is always in the healthpoints collection) and calculate entire armor reduce
 
-            final_reduce += hp["equiped armor"][armor]["damage reduce"]
+            final_reduce += hp["equipped armor"][armor]["damage reduce"]
 
         # subtract reduce by one, because percentage and multiply that to the damage, which reduces it
         final_damage = (1-final_reduce) * damage

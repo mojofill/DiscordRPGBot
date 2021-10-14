@@ -336,9 +336,8 @@ class General(commands.Cog):
         
         em.add_field(name="Weapons",value="Information on all of your weapons.",inline=False)
 
-        del bp["weapons"]["equiped weapon"]
+        del bp["weapons"]["equipped weapon"]
         del bp["weapons"]["damage increase multiply"]
-        del bp["weapons"]["damage reduce multiply"]
         del bp["weapons"]["limit"]
 
         msg = ''

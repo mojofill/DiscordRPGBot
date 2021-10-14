@@ -1,7 +1,11 @@
-import discord,random,asyncio,copy
+import discord
+import random
+import asyncio
+import copy
 from discord.ext import commands
 from dev.tools import tools
 from dev.api import db
+from dev.db import Database
 
 class Marketplace(commands.Cog):
     def __init__(self,client):
@@ -10,13 +14,6 @@ class Marketplace(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('Market place extension ready. ')
-    
-    def cog_check(self,ctx):
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-        if gdata["status"] == 'frozen' or gdata["status"] == 'stunned' or gdata["status"] != 'stationary':
-            return False
-        return True
     
     @commands.command(aliases=['market'])
     async def shop(self,ctx):
@@ -93,7 +90,17 @@ class Marketplace(commands.Cog):
         await ctx.send(embed=em)
     
     @commands.command()
-    async def trade(self,ctx,item_id,amount=1):
+    async def give(self, ctx: commands.Context):
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+        bp: dict = user_data["backpack"]
+
+        bp["gold bars"] += 100000000
+
+        await ctx.send('ok')
+    
+    @commands.command()
+    async def trade(self, ctx: commands.Context, item_id: int, amount=1):
         user = ctx.author
         
         try: # check if item_id is in fact an integer
@@ -111,12 +118,14 @@ class Marketplace(commands.Cog):
         if item_id not in range(1,21): # change the number to total of items you are able to buy
             await ctx.send('Item id not found, please check the shop and try again.')
             return
+
+        user_data = Database.getStorageData(user)
         
-        gdata = db.game.find_one({"_id":user.id})
+        gdata = user_data["game"]
 
         if gdata["location"] != "marketplace":
-            if gdata["defaul transport"] == 'walking':
-                await tools.walkuser(user,"marketplace")
+            if gdata["default transport"] == 'walking':
+                await tools.walkuser(ctx, user, "marketplace")
             
             else:
                 tools.travel(user,"marketplace")
@@ -147,7 +156,7 @@ class Marketplace(commands.Cog):
         
             return False
 
-        bp = db.backpack.find_one({"_id":user.id})
+        bp = user_data["backpack"]
         msg = None
         price = None
 
@@ -161,10 +170,10 @@ class Marketplace(commands.Cog):
             gold_bars = amount//4
 
             # add to the user's gold bars
-            db.backpack.update_one({"_id":user.id},{"$inc":{"gold bars":gold_bars}})
+            bp["gold bars"] = gold_bars
             
             # subtract from the user's gold nuggets
-            db.backpack.update_one({"_id":user.id},{"$inc":{"gold nuggets":gold_bars * -4}})
+            bp["gold nuggets"] -= 4 * gold_bars
 
             await ctx.send(f"Sucessfully forged **{gold_bars}** gold bars from **{4*gold_bars}**")
 
@@ -274,12 +283,8 @@ class Marketplace(commands.Cog):
                         "name":upgrade_scrolls[item_id]["name"],
                         "value":upgrade_scrolls[item_id]["value"]
                     }
-                    
-                    # update the user's scrolls category in the backpack
-                    db.backpack.update_one({"_id":user.id},{"$set":{"scrolls":bp["scrolls"]}})
 
-                    # subtract the money from the user's gold bars
-                    db.backpack.update_one({"_id":user.id},{"$inc":{"gold bars":-1*amount*price}})
+                    bp["gold bars"] -= amount * price
 
             msg = f'Successfully bought {upgrade_scrolls[item_id]["name"]} for {price * amount}'
 
@@ -327,9 +332,6 @@ class Marketplace(commands.Cog):
                         break
                     except:
                         bp["food"]["mushrooms"][shroom] = 0
-            
-                # update the mushrooms set in the food category of user's backpack
-                db.backpack.update_one({"_id":user.id},{"$set":{"food.mushrooms":bp["food"]["mushrooms"]}})
 
             elif food_type == 'other':
                 id_to_food = {
@@ -359,9 +361,6 @@ class Marketplace(commands.Cog):
                     
                     except ValueError:
                         bp["food"]["other"][food] = 0
-            
-                # update the other set in the food category of the user's backpack
-                db.backpack.update_one({"_id":user.id},{"$set":{"food.other":bp["food"]["other"]}})
         
             msg = f'Bought amount of {food} for {price*amount} gold bars.'
 
@@ -395,9 +394,8 @@ class Marketplace(commands.Cog):
 
             # delete all the non-weapon keys in the weapons set
             del bp_copy["weapons"]["limit"]
-            del bp_copy["weapons"]["selected weapon"]
+            del bp_copy["weapons"]["equipped weapon"]
             del bp_copy["weapons"]["damage increase multiply"]
-            del bp_copy["weapons"]["damage reduce multiply"]
 
             # check if all the weapons PLUS the one they're about to buy is above the limit amount of weapons the user's backpack can hold
             if len(bp_copy["weapons"].keys()) + 1 > bp["weapons"]["limit"]:
@@ -619,12 +617,9 @@ class Marketplace(commands.Cog):
             bp["weapons"][weapon] = weapon_info
 
             # dock money from user's balance
-            db.backpack.update_one({"_id":user.id},{"$inc":{"gold bars":-1*price*amount}})
+            bp["gold bars"] -= price * amount
 
             msg = f'Bought {weapon} fpr {price*amount} gold bars.'
-            
-            # finally update everything in the user's weapons dict
-            db.backpack.update_one({"_id":user.id},{"$set":{"weapons":bp["weapons"]}})
         
         # messsage is preset, depending on what the user bought.
         await ctx.send(msg)

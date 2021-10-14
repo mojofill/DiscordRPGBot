@@ -319,9 +319,13 @@ async def start(ctx:commands.Context):
             "weapons":{}, # contains all the weapons the user has
             "equipped weapon":None,
             "limit":7,
-            "equiped weapon":None,
+            "damage increase multiply":1
+        },
+        "bows":{
+            "bows":{},
+            "equipped bow":None,
+            "limit":7,
             "damage increase multiply":1,
-            "damage reduce multiply":1
         },
         "armor":armor,
         "armor ratio":tools.getArmorDamageReductionRatio(armor), # type dict, armor damage reduction participation compared to total damage reduce
@@ -633,7 +637,7 @@ async def start(ctx:commands.Context):
 
             An important tip is you can equip your shield to block off attacks. However, each time a monster hits your sheild, depending on your shields power, if an opponent hits your shield a certain amount of times, it gets knocked out of your hand and you have to pick it up AND equip it again.
 
-            Another thing is if you get 6 consecutive punches on your target, you get rewarded with a chance to Burst Attack on your target, rapidly releasing 7 attacks with your equiped weapon if it's a one-handed weapon, and 5 attacks if it's a two-handed weapon. Within this short window the user (if the target is a user) cannot attack back. Just the `.attack` will not work, but anything else works fine. However, you have to get 3 consecutive punches without taking damage or 
+            Another thing is if you get 6 consecutive punches on your target, you get rewarded with a chance to Burst Attack on your target, rapidly releasing 7 attacks with your equipped weapon if it's a one-handed weapon, and 5 attacks if it's a two-handed weapon. Within this short window the user (if the target is a user) cannot attack back. Just the `.attack` will not work, but anything else works fine. However, you have to get 3 consecutive punches without taking damage or 
 
             Finally, one more combat tip - the 
 

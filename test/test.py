@@ -4,6 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
+def errorTest():
+    class ErrorClass(Exception):
+        pass
+
+    raise ErrorClass("will this work?")
+
 def test():
     def getYFromX(x: int):
         return math.floor((x + 1) * (x - 10)) # example equation
@@ -286,5 +292,4 @@ def travelAcrossMapTest():
     plt.show()
 
 if __name__ == '__main__':
-    umbrellaTestFunction()
-    travelAcrossMapTest()
+    errorTest()
