@@ -793,65 +793,6 @@ class Tools:
     async def startMonsterAttackLoop(self, ctx: commands.Context, user: discord.User, monster_data: dict):
         """`monster_data` should be the return value of `spawnMonster`."""
 
-        class PlayerInAttack(Exception): # error class
-            """Error gets raised if the user tries to attack but is currently still in attack"""
-
-        class _Player:
-            def __init__(self):
-                user_data = Database.getStorageData(user)
-                gdata = user_data["game"]
-
-                self.energy_depleted = True if gdata["energy"] == 0 else False
-
-                hp = user_data["healthpoints"]
-                bp = user_data["backpack"]
-
-                self.health = hp["health"]
-
-                wpn = None if bp["weapons"]["equipped weapon"] == None else bp["weapons"]["equipped weapon"]
-                bow = None if bp["bows"]["bow"] == None else bp["bows"]["bow"]
-
-                self.wpn = None
-                self.bow = None
-
-                if not wpn == None:
-                    self.wpn = bp["weapons"][wpn]
-                
-                if not bow == None:
-                    self.bow = bp["bows"][bow]
-
-                self.attack_wait = self.wpn["attack time"] if not self.wpn == None else self.bow["attack time"]
-
-                self.in_attack = False # if True then the user cannot do anything until False again
-            
-            async def attackWpn(self):
-                """Take away energy taken per attack. also set `self.in_attack` equal to `True`, `awit asyncio.sleep(self.attack_wait)`"""
-
-                if self.in_attack:
-                    raise PlayerInAttack()
-
-                self.in_attack = True
-
-                await asyncio.sleep(self.attack_wait)
-
-                user_data = Database.getStorageData(user)
-
-                bp = user_data["backpack"]
-                
-                self.wpn[""]
-                
-                self.in_attack = False
-
-            async def shoowBow(self):
-                if self.in_attack:
-                    raise PlayerInAttack()
-                
-                self.in_attack
-
-                await asyncio.sleep(self.attack_wait)
-
-        player = _Player()
-
         class Monster:
             def __init__(self, enemy: discord.User, *, name: str, wpn: dict = None, bow: str = None, shield: dict = None, attack_wait: int):
                 self.name = name

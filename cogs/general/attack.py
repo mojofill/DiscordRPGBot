@@ -19,7 +19,7 @@ class Attack(commands.Cog):
     async def punch(self,ctx:commands.Context,enemy):
         user = ctx.author
 
-        user_data = tools.getStorageData(user)
+        user_data = Database.getStorageData(user)
         
         user_hp = user_data["health"]
 
@@ -43,7 +43,7 @@ class Attack(commands.Cog):
 
         user_data["backpack"]["emeralds"] += stolen_money
         
-        enemy_data = tools.getStorageData(enemy)
+        enemy_data = Database.getStorageData(enemy)
 
         enemy_data["backpack"] -= stolen_money
 
@@ -72,8 +72,8 @@ class Attack(commands.Cog):
             ctx.message.add_reaction('<:x:883531508198035456>')
             return
 
-        for wpn in bp["weapons"]:
-            if bp["weapons"][wpn]["name"] == wpn_name:
+        for wpn in bp["weapons"]["weapons"]:
+            if bp["weapons"]["weapons"][wpn]["name"] == wpn_name:
                 # update in the user's document in backpack collection with equipped weapon as the weapon argument
 
                 user_data["backpack"]["equipped weapon"] = wpn_name
@@ -86,6 +86,7 @@ class Attack(commands.Cog):
 
                 return
         
+        # if code reaches here then the bot has not found a weapon with the given name
         await ctx.send(embed=discord.Embed(
             description=f'You do not have weapon of name `{wpn_name}`'
         ))
@@ -96,7 +97,7 @@ class Attack(commands.Cog):
 
         user = ctx.author
 
-        user_data = tools.getStorageData(user)
+        user_data = Database.getStorageData(user)
 
         bp = user_data["backpack"]
 
@@ -127,7 +128,7 @@ class Attack(commands.Cog):
             await ctx.send('Invalid unequip command, check your backpack with `.bp` for your weapons.')
             return
 
-        user_data = tools.getStorageData(ctx.author)
+        user_data = Database.getStorageData(ctx.author)
         
         bp = user_data["backpack"]
         

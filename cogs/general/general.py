@@ -1,5 +1,6 @@
 import discord,datetime,asyncio
 from discord.ext import commands
+from dev.db import Database
 from dev.tools import tools
 from dev.api import db
 from threading import Thread
@@ -82,7 +83,7 @@ class General(commands.Cog):
         
         user = ctx.author
 
-        user_data = tools.getStorageData(user)
+        user_data = Database.getStorageData(user)
         
         def update_game_thread():
             db.game.replace_one({"_id":user.id}, user_data["game"])

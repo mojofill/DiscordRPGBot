@@ -8,7 +8,7 @@ from dev.api import db
 from dev.db import Database
 
 class Marketplace(commands.Cog):
-    def __init__(self,client):
+    def __init__(self, client: commands.Bot):
         self.client = client
 
     @commands.Cog.listener()
@@ -389,16 +389,8 @@ class Marketplace(commands.Cog):
 
             # add limit to how many weapons user's backpack can store
 
-            # copy the backpack. use deepcopy because .copy on a dict instance does not work for nested dictionaries, as it counts the value as reference
-            bp_copy = copy.deepcopy(bp)
-
-            # delete all the non-weapon keys in the weapons set
-            del bp_copy["weapons"]["limit"]
-            del bp_copy["weapons"]["equipped weapon"]
-            del bp_copy["weapons"]["damage increase multiply"]
-
             # check if all the weapons PLUS the one they're about to buy is above the limit amount of weapons the user's backpack can hold
-            if len(bp_copy["weapons"].keys()) + 1 > bp["weapons"]["limit"]:
+            if len(bp["weapons"]["weapons"].keys()) + 1 > bp["weapons"]["limit"]:
                 await ctx.send(f'You do not have enough space in your backpack to store {weapon}. Use `.store <item>` to store your weapon in your vault.')
                 return
             
@@ -416,7 +408,7 @@ class Marketplace(commands.Cog):
 
                 try:
                     # get the message from the user
-                    msg = await self.client.wait_for('message',check=check,timeout=20)
+                    msg: discord.Message = await self.client.wait_for('message',check=check,timeout=20)
                     # if code gets here that means user has sent a message
                     user_has_replied = True
                 
@@ -437,9 +429,9 @@ class Marketplace(commands.Cog):
                         found_copy_of_name = False
 
                         # go through all the weapons in bp_copy because bp_copy does not have keys that are not weapons
-                        for weapon_name in bp_copy["weapons"]:
+                        for weapon_name in bp["weapons"]["weapon"]:
                             # compare the actual name of the weapon, instead of the reference that the computer has to reference to
-                            if bp_copy["weapons"][weapon_name]["name"] == weapon:
+                            if bp["weapons"]["weapons"][weapon_name]["name"] == weapon:
                                 # set this as true to tell later on we've already update and set a default weapon name
                                 found_copy_of_name = True
 
@@ -487,9 +479,9 @@ class Marketplace(commands.Cog):
                             # code below to check if the user has tried to name the weapon that another weapon's name is
                             all_weapon_names = []
 
-                            for weapon in bp_copy["weapons"]:
+                            for weapon in bp["weapons"]["weapons"]:
                                 await ctx.send(weapon)
-                                all_weapon_names.append(bp_copy["weapons"][weapon]["name"])
+                                all_weapon_names.append(bp["weapons"]["weapons"][weapon]["name"])
 
                             if name in all_weapon_names:
                                 # user cannot use this name because another weapon is called that already
@@ -521,100 +513,100 @@ class Marketplace(commands.Cog):
             await ctx.send(f'This is your name {name}.')
             
             weapons = {
-            "spear": {
-                "name":"spear",
-                "health": 30,
-                "steal range": [
-                    100000,
-                    500000
-                ],
-                "damage":60,
-                "cooldown":600,
-                "energy taken":10,
-                "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
-                "xp gain":{
-                    "on hit xp":[10,20],
-                    "final kill xp":50
+                "spear": {
+                    "name":"spear",
+                    "durability": 30,
+                    "steal range": [
+                        100000,
+                        500000
+                    ],
+                    "damage":60,
+                    "cooldown":600,
+                    "energy taken":10,
+                    "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
+                    "xp gain":{
+                        "on hit xp":[10,20],
+                        "final kill xp":50
+                    },
+                    "enchantments":{}
                 },
-                "enchantments":{}
-            },
-            "crossbow":{
-                "name":"crossbow",
-                "health":30,
-                "steal range": [
-                    30000,
-                    70000
-                ],
-                "damage":50,
-                "cooldown":600,
-                "energy taken":10,
-                "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
-                "xp gain":{
-                    "on hit xp":[10,20],
-                    "final kill xp":50
+                "crossbow":{
+                    "name":"crossbow",
+                    "durability":30,
+                    "steal range": [
+                        30000,
+                        70000
+                    ],
+                    "damage":50,
+                    "cooldown":600,
+                    "energy taken":10,
+                    "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
+                    "xp gain":{
+                        "on hit xp":[10,20],
+                        "final kill xp":50
+                    },
+                    "enchantments":{}
                 },
-                "enchantments":{}
-            },
-            "sword": {
-                "name":"sword",
-                "health":30,
-                "steal range": [
-                    40000,
-                    80000
-                ],
-                "damage":75,
-                "cooldown":600,
-                "energy taken":10,
-                "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
-                "xp gain":{
-                    "on hit xp":[10,20],
-                    "final kill xp":50
+                "sword": {
+                    "name":"sword",
+                    "durability":30,
+                    "steal range": [
+                        40000,
+                        80000
+                    ],
+                    "damage":75,
+                    "cooldown":600,
+                    "energy taken":10,
+                    "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
+                    "xp gain":{
+                        "on hit xp":[10,20],
+                        "final kill xp":50
+                    },
+                    "enchantments":{}
                 },
-                "enchantments":{}
-            },
-            "ax": {
-                "name":"ax",
-                "health":30,
-                "steal range": [
-                    200000,
-                    600000
-                ],
-                "knockout":300,
-                "damage":90,
-                "cooldown":900,
-                "energy taken":15,
-                "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
-                "xp gain":{
-                    "on hit xp":[10,20],
-                    "final kill xp":50
+                "ax": {
+                    "name":"ax",
+                    "durability":30,
+                    "steal range": [
+                        200000,
+                        600000
+                    ],
+                    "knockout":300,
+                    "damage":90,
+                    "cooldown":900,
+                    "energy taken":15,
+                    "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
+                    "xp gain":{
+                        "on hit xp":[10,20],
+                        "final kill xp":50
+                    },
+                    "enchantments":{}
                 },
-                "enchantments":{}
-            },
-            "club": {
-                "name":"club",
-                "health":30,
-                "steal range": [
-                    100000,
-                    300000
-                ],
-                "knockout":600,
-                "damage":90,
-                "cooldown":900,
-                "energy taken":15,
-                "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
-                "xp gain":{
-                    "on hit xp":[10,20],
-                    "final kill xp":50
-                },
-                "enchantments":{}
+                "club": {
+                    "name":"club",
+                    "durability":30,
+                    "steal range": [
+                        100000,
+                        300000
+                    ],
+                    "knockout":600,
+                    "damage":90,
+                    "cooldown":900,
+                    "energy taken":15,
+                    "upgrade price":500, # XP. 1 hit from this gives you a random number between [10,20], and if you kill something with this weapon, you get 50 XP
+                    "xp gain":{
+                        "on hit xp":[10,20],
+                        "final kill xp":50
+                    },
+                    "enchantments":{}
                 }
             }
 
-            # get weapon dict
+            # get specific weapon's data (dict)
             weapon_info = weapons[weapon]
 
             # set the weapon in the backpack as dict above
-            bp["weapons"][weapon] = weapon_info
+            bp["weapons"]["weapons"] = weapon_info
 
             # dock money from user's balance
             bp["gold bars"] -= price * amount
@@ -625,8 +617,8 @@ class Marketplace(commands.Cog):
         await ctx.send(msg)
         
     @commands.command(name='return')
-    async def _return(self,ctx,item_id):
-        pass
+    async def _return(self, ctx: commands.Context, item_id: int):
+        """Returns an item back to the shop, recieving 90% the value back. Item is identified by the item id given (`.return <item_id>`)"""
   
 def setup(client):
     client.add_cog(Marketplace(client))
