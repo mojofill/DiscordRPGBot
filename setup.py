@@ -240,13 +240,13 @@ async def start(ctx:commands.Context):
 
     hp = {
         "_id":user.id,
-        "health":100,
-        "energy":100,
-        "equipped armor":{},
-        "fist damage":20,
-        "fist steal range":[1000,2000],
-        "wet":False,
-        "energy gain time":1
+        "health":100, # base health the user has
+        "energy":100, # base energy the user has
+        "equipped armor":{}, # holds the armor the user is currently wearing  - other armor is stored in the backpack
+        "fist damage":20, # TODO decide whether to keep this
+        "fist steal range":[1000,2000], #??? should i keep?
+        "wet":False, # this means if the user is currently in the rain or not
+        "energy gain time":1 # every second the user gains a portion of energy back - MIGHT BE TOO MUCH FOR THE BOT. will probably just set a larger energy, and remind the user to replenish his or her energy every once in a while
     }
 
     coliseum = {
@@ -868,9 +868,9 @@ def run():
     client.run(os.getenv('TOKEN'))
 
 def main():
-    try:
+    # try:
         run()
-    except:
+    # except:
         print('Bot has crashed, retrying...')
         # recursion
         main()

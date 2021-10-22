@@ -1,6 +1,7 @@
 import random
 import datetime
 import asyncio
+from typing import Literal
 import discord
 import time
 import gc
@@ -190,7 +191,7 @@ class Tools:
         
         return ratio
     
-    def death_message(self,user,death_type,monster_type=None,weather_type=None) -> str:
+    def death_message(self, user: discord.User, death_type: Literal["monster", "player", "weather"], monster_type: str = None,weather_type: str = None) -> discord.Embed:
         """Returns a string that tells the user given that he or she has died, specifying which monster killed the user and how the user died."""
         monster_actions_past_tense = {
             "goblin":[
@@ -244,7 +245,14 @@ class Tools:
         elif death_type == 'weather':
             msg = random.choice(death_messages["weather"][weather_type]).replace('__user__',user)
         
-        return msg
+        em = discord.Embed(
+            title='Death',
+            description=msg
+        )
+
+        em.set_author(name=user, icon_url=user.avatar_url())
+
+        return em
     
     def get_potion_value_stats(self,potion_type:str,chests=False,**kwargs) -> tuple:
         """Method returns a dict containing the duration, value, falcon value and rarity of the potion."""
@@ -790,21 +798,95 @@ class Tools:
 
         return base_monster, monster_rank
     
-    async def startMonsterAttackLoop(self, ctx: commands.Context, user: discord.User, monster_data: dict):
+    async def startMonsterAttackLoop(self, ctx: commands.Context, user: discord.User, monster_rank: int, monster_data: dict):
         """`monster_data` should be the return value of `spawnMonster`."""
 
+        process_all_damage_reduce_func = self.process_all_damage_reduce
+        death_message = self.death_message
+
+        user_data = Database.getStorageData(user)
+
+        hp = user_data["healthpoints"]
+        bp = user_data["backpack"]
+
+        def getMonsterIntelligence(monster_name: str, monster_rank: int):
+            """Monster intelligence is split in these 5 ranges
+                1, 20: pretty dumb
+                20, 40: very slow reaction time/doesnt know what to do half the time
+                40, 60: knows what to do but slow at performing it
+                60, 80: generally knows what to do and is good at performing it
+                80, 100: experienced monster who knows exactly wtf its supposed to do and kills less experienced monster and is usually at the top of a monster camp hierarchy, regardless of size.
+            """
+            
+            monster_intelligences = {                
+                "mogosok":{
+                    1:[1, 20],
+                    2:[20, 50],
+                    3:[50, 80],
+                    4:[80, 100]
+                }
+            }
+
+            rand_range = monster_intelligences[monster_name][monster_rank]
+
+            return random.randint(rand_range[0], rand_range[1])
+
         class Monster:
-            def __init__(self, enemy: discord.User, *, name: str, wpn: dict = None, bow: str = None, shield: dict = None, attack_wait: int):
+            def __init__(self, enemy: discord.User, enemyPlayerObject, name: str, rank: int, attack_wait: int, wpn: dict = None, bow: str = None, shield: dict = None):
                 self.name = name
                 self.wpn = wpn
                 self.bow = bow
                 self.shield = shield
-                self.enemy = enemy
+                self.enemyDiscordUser = enemy
                 self.attack_wait = attack_wait
+
+                self.enemyPlayerObject = enemyPlayerObject
+
+                self.health = monster_data["health"]
+                self.attack_type = monster_data["attack type"]
+
+                equipment_type = monster_data["equipment type"]
+                
+                self.equipment_name = monster_data[equipment_type]["name"]
+                self.equipment_durability = monster_data[equipment_type]["durability"]
+                self.damage = monster_data[equipment_type]["damage"]
+
+                self.equipment_broke = False
+
+                intelligence = getMonsterIntelligence(name, rank) # number that shows how smart the monster is - 1 = stupid, 4 = oh my god this is the smartest monster that is a tactician, stalker, everything
+
+                if intelligence in range(1, 21):
+                    self.intelligence = 1
+                
+                elif intelligence in range(21, 51):
+                    self.intelligence = 2
+                
+                elif intelligence in range(51, 81):
+                    self.intelligence = 3
+                
+                else:
+                    self.intelligence = 4
+            
+            def incrementHealth(self, amount: int):
+                """Increments the given amount `amount: int` to monster's heath (`self.health`)"""
+
+                self.health += amount # if to take away health amount should be negative
+            
+            def throwWeapon(self) -> bool:
+                """Throws the monster's weapon at the player - deals 3x damage but weapon instantly breaks"""
+
+                self.enemyPlayerObject.deduceHealth(3 * self.damage)
+
+                if self.enemyPlayerObject.health <= 0:
+                    return True
+                
+                else:
+                    self.equipment_broke = True
+                    return False
             
             async def startAttackLoop(self):
                 """Asyncronous method will starting asyncio loop that will get the monster to start attacking the user."""
-                user = self.enemy
+                user = self.enemyDiscordUser
                 
                 user_data = Database.getStorageData(user)
                 
@@ -812,14 +894,15 @@ class Tools:
 
                 open_attack_chance = False # if this is set True then that means the AI thinks that this is a good time to fight the player, because his armor either broke or he is knocked down
                 
-                fightBool = False # if this becomes false then we stop the loop
+                fightBool = True # if this becomes false then we stop the loop
 
                 def getVerbOfWeaponName(weapon_name: str):
                     """Returns the past tense verb that goes with the weapon name"""
                     base_weapon_name = weapon_name.split(' ')[1]
 
                     verb_from_weapon = {
-                        "club":"struck"
+                        "club":"struck",
+                        "spear":"stabbed"
                     }
 
                     return verb_from_weapon[base_weapon_name]
@@ -827,13 +910,18 @@ class Tools:
                 while fightBool:
                     if open_attack_chance: # this means the monster has decided to attack the user
                         """Code here will deal the actual damage to the user"""
+
+                        await asyncio.sleep(self.attack_wait)
+
                         try:
                             weapon_name: str = self.wpn["name"]
                             weapon_damage: int = self.wpn["damage"]
 
-                            weapon_damage = tools.process_all_damage_reduce(user, weapon_damage)
+                            final_weapon_damage = process_all_damage_reduce_func(user, weapon_damage)
 
-                            hp["health"] -= weapon_damage
+                            hp["health"] -= final_weapon_damage
+
+                            self.enemyPlayerObject.deduceHealth(final_weapon_damage)
 
                             verb = getVerbOfWeaponName(weapon_name)
 
@@ -844,11 +932,23 @@ class Tools:
                             em.add_field(name='\u200b', value=f"""
                                 Remaining health: {hp["health"]}
                             """)
-                            
-                            await ctx.send(embed=em)
 
                         except TypeError: # meaning wpn was None (meaning the equipment the monster has is a bow) and is not "subscriptable" - cannot access keys of wpn because its not a dict
-                            hp["health"] -= self.bow["damage"]
+                            base_bow_damage = self.bow["damage"]
+
+                            final_bow_damage = process_all_damage_reduce_func(user, base_bow_damage)
+                            
+                            em = discord.Embed(
+                                description=f'A {self.name} shot its {self.bow["name"]} at {user.mention}, dealing **{final_bow_damage}**'
+                            )
+
+                            em.add_field(name='\u200b', value=f"""
+                                Remaining health: {hp["health"]}
+                            """)
+                            
+                            hp["health"] -= final_bow_damage
+                        
+                        await ctx.send(embed=em)
                     
                     else:
                         """Code here will decide whether to wait for an opening, randomly (read = stupidly) try to attack or run away (this is only if the user has not attacked and only retreated for a duration of time."""
@@ -867,9 +967,112 @@ class Tools:
                             await asyncio.sleep(1) # at least sleep 1 second to give the user time to think and prepare
                         
                         else:
-                            """Take in data from player object """
-                            pass
+                            """Take in data from player and decide what the next step should be"""
+
+                            if not self.equipment_durability <= 4: # this means that the monster's weapon is not about to break
+                                if self.enemyPlayerObject.health <= 2 * self.damage: # this means that the player is only 2 hits away from death
+                                    # higher chance of monster hitting the player
+
+                                    chance = random.randint(1, 3)
+
+                                    if chance in range(1, 3): # 1 or 2 - does not include 3
+                                        # hit the player
+                                        await asyncio.sleep(self.attack_wait)
+                                        
+                                        self.enemyPlayerObject.deduceHealth(self.damage)
+                                        
+                                        em = discord.Embed(
+                                            title=f'{self.name} attacked {self.enemyDiscordUser}, dealing {self.damage} damage!'
+                                        )
+
+                                        em.set_author(name=self.enemyDiscordUser, icon_url=self.enemyDiscordUser.avatar_url())
+                                        
+                                        em.add_field(name='Player Data', value=f"""
+                                            ❤️ Remaining HP: {self.enemyPlayerObject.health}
+                                        """)
+                                        
+                                        await ctx.send(embed=em)
+                                        
+                                else: # user is not about to die
+                                    # now, based on the monster's intelligence, it can notice if the user is currently in attack and attack in the perfect time
+                                    if self.enemyPlayerObject.in_attack: # code below will run if the enemy player is currently in attack - else just passes
+                                        if not self.intelligence <= 2: # if the monster is less than 2 then just forget about it - too dumb
+                                            if self.intelligence == 3:
+                                                number = random.randint(1, 4)
+
+                                            else:
+                                                number = random.randint(1, 3)
+
+                                            if number == 1: # if number is 1 then that means the monster has enough intelligence to spot when the player is in the middle of an attack and strike back
+                                                open_attack_chance = True
+                                    
+                                    else: # this means that the user is not currently in the middle of attacking - the monster can choose to attack or wait.
+                                        number = random.randint(1, 10)
+
+                                        if number in range(1, 6):
+                                            await asyncio.sleep(0.2)
+                                            open_attack_chance = True
+                            
+                            else: # monster weapon about to break - throw weapon at player to gain 3x attack damage - however weapon instant break, resorts to punching if NOT player already dead
+                                player_dead = self.throwWeapon()
+
+                                if player_dead:
+                                    em = death_message(user, "monster", monster_type=self.name)
+
+                                    fightBool = False
+                    
+                    if self.enemyPlayerObject.health <= 0:
+                        fightBool = False
+
+                        await ctx.send('you died :(')
         
+        class Player:
+            def __init__(self):
+                self.health = hp["health"] # current health the user has left
+                self.energy = hp["energy"] # current energy the user has left
+
+                self.in_attack = False
+
+            def deduceHealth(self, base_damage: int) -> None:
+                """Takes IN the user's armor reduction, and takes away the final damage reduce."""
+
+                final_damage = process_all_damage_reduce_func(user, base_damage) # using this because i cannot directly access the tools process_all_damage_reduce
+
+                hp["heathpoints"] -= final_damage
+
+            async def attack(self, form: Literal["melee", "bow"], monster: Monster) -> None:
+                """Takes in the form, which can only be `melee` or `bow`, and attacks the monster."""
+
+                if form == 'melee':
+                    """Attack monster with weapon"""
+
+                    equipped_wpn: str = bp["weapons"]["equipped weapon"]
+                    
+                    damage: int = bp["weapons"]["weapons"][equipped_wpn]["damage"]
+
+                    attack_wait = bp["weapons"]["weapons"][equipped_wpn]["attack wait"]
+            
+                else:
+                    """Attack monster with bow"""
+
+                    equipped_bow: int = bp["bows"]["equipped bow"]
+
+                    damage: int = bp["bows"][equipped_bow]
+
+                    attack_wait = bp["bows"]["bows"][equipped_bow]["attack wait"]
+                
+                self.in_attack = True
+                
+                await asyncio.sleep(attack_wait)
+
+                self.in_attack = False
+                    
+                monster.incrementHealth(-damage)
+
+                # if on challenge mode, every few seconds monster wll regain health
+
+        player = Player()
+
         name = monster_data["name"]
         attack_type = monster_data["attack type"]
         equipment_type = monster_data["equipment type"]
@@ -877,16 +1080,19 @@ class Tools:
         attack_wait = monster_data[equipment_type]["attack time"] # the time it takes for a single attack
 
         if attack_type == 'melee':
-            await ctx.send('code has reached here')
             monster_wpn = monster_data["weapon"]
-            monster = Monster(user, name=name, wpn=monster_wpn, shield=shield, attack_wait=attack_wait)
+            monster = Monster(user, player, name=name, rank=monster_rank, wpn=monster_wpn, shield=shield, attack_wait=attack_wait)
         
         else:
             monster_bow = monster_data["bow"]
-            monster = Monster(user, name=name, bow=monster_bow, shield=shield, attack_wait=attack_wait)
+            monster = Monster(user, player, name=name, rank=monster_rank, bow=monster_bow, shield=shield, attack_wait=attack_wait)
 
         # starts the actual monster attack loop
+        await ctx.send('attempting to start attack loop')
+        
         await monster.startAttackLoop()
+
+        await ctx.send('code somehow finished')
 
     async def spawnMonster(self, ctx: commands.Context, client: commands.Bot, user: discord.User, monster_type: str, monster_rank: int) -> bool or dict:
         """Method spawns a monster. User can either choose to engage the monster, or on rare occasions the monster will come towards to user. Returns `True` if the monster spawn worked, `False` if not (the user might have declined)"""
@@ -1202,10 +1408,7 @@ class Tools:
 
         shield_name = monster_data["shield"] if monster_data["shield"] != None else None
 
-        m: discord.Message = await ctx.send(f"{user.mention} you have found a **{base_monster}**! Enter `.more` to find out more about this monster. React with 🇾 to engage with the {base_monster}, 🇳 to pass. Message will timeout in 60 seconds.")
-
-        await m.add_reaction('🇾')
-        await m.add_reaction('🇳')
+        await ctx.send(f"{user.mention} you have found a **{base_monster}**! Enter `.more` to find out more about this monster. React with 🇾 to engage with the {base_monster}, 🇳 to pass. Message will timeout in 60 seconds.")
 
         em = discord.Embed(
             title='Monster Found!',
@@ -1224,7 +1427,10 @@ class Tools:
         em.set_author(name=user, icon_url=user.avatar_url)
         em.add_field(name="\u200b",value='You can use the Thokim Epitome gifted by the Mages to find out more about a monster by `.more <object name>`. For example, `.more mogosok`.')
         
-        await ctx.send(embed=em)
+        m: discord.Message = await ctx.send(embed=em)
+
+        await m.add_reaction('🇾')
+        await m.add_reaction('🇳')
 
         if random.randint(1, 100) == 1: # monster has chosen to attack the user
             await ctx.send(f'{user.mention} Watch out! A {base_monster} has decided to attack you!')
@@ -1249,8 +1455,6 @@ class Tools:
                 await ctx.send(f'{user.mention} you have timed out ❌')
             
             if ans == '🇾':
-                await ctx.send('please let this work')
-
                 return monster_data
         
             else: # user has passed
@@ -1350,12 +1554,12 @@ class Tools:
 
         weather = db.climate.find_one({"_id":"weather"})
         
-        final_embed = discord.Embed(color=self.lime,title=weather["weather"])
+        final_embed = None
 
         for risk_type in weather["risks"]["risk type"]:
             if risk_type == 'direct cause':
                 if weather["weather"] == 'hurricane': # this one is just the direct cause, not the chance one. Hurricane results in an instant death, UNLESS you have special equipment on
-                    final_embed.add_field(name="Death",value=self.death_message(user,"weather",weather_type="hurricane"))
+                    final_embed = self.death_message(user, "weather", weather_type="hurricane")
             
                 elif weather["weather"] == 'tornado':
                     # choose random object that falls down on the user, dealing 50 HP every 5 seconds
@@ -1393,7 +1597,8 @@ class Tools:
             
                 elif weather["weather"] == 'flood':
                     # isntant death, just like a hurricane, but there is no possibility of losing your equipped weapon.
-                    final_embed.add_field(name='Death',value=self.death_message(user,death_type="weather",weather_type="flood"))
+
+                    final_embed = self.death_message(user, "weather", weather_type="flood")
 
                 # and thats really about it for the direct cause weather risk type
                 # i can always add more
@@ -1680,11 +1885,13 @@ class Tools:
         
     def process_all_damage_reduce(self,user:discord.User,damage) -> float:
         """Returns the final damage of after processing the damage taken away from damage reduction (armor)"""
-        hp = db.healthpoints.find_one({"_id":user.id})
+        user_data = Database.getStorageData(user)
+        
+        hp = user_data["healthpoints"]
 
         final_reduce = 0
 
-        for armor in hp["armor"]:
+        for armor in hp["equipped armor"]:
             # go through all the armor in the user's hp (what the user is wearing right now is always in the healthpoints collection) and calculate entire armor reduce
 
             final_reduce += hp["equipped armor"][armor]["damage reduce"]
