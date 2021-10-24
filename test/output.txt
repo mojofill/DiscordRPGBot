@@ -1,0 +1,8 @@
+number = 4 - monster has decided to fight you - you are not in the middle of an attack
+A mogosok used its mogo club and struck you, dealing 7.
+you have attacked the monster, dealing 12. Monster remaining health: 1
+monster decided to suddenly attack the player
+A mogosok used its mogo club and struck you, dealing 7.
+you have attacked the monster, dealing 12. Monster remaining health: -11
+monster decided to suddenly attack the player
+you have attacked the monster, dealing 12. Monster remaining health: -23

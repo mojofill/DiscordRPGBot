@@ -670,7 +670,7 @@ class Tools:
         Returns a tuple with index 0 = attack time, index 1 = per amount of swings"""
         
         if equipment_type == 'bow':
-            return 0.5
+            return 0.5 # all bows have 0.5 second attack time
         
         else:
             wpn_attack_times = {
@@ -840,7 +840,7 @@ class Tools:
                 self.enemyDiscordUser = enemy
                 self.attack_wait = attack_wait
 
-                self.enemyPlayerObject = enemyPlayerObject
+                self.enemyPlayerObject: Player = enemyPlayerObject
 
                 self.health = monster_data["health"]
                 self.attack_type = monster_data["attack type"]
@@ -918,8 +918,6 @@ class Tools:
                             weapon_damage: int = self.wpn["damage"]
 
                             final_weapon_damage = process_all_damage_reduce_func(user, weapon_damage)
-
-                            hp["health"] -= final_weapon_damage
 
                             self.enemyPlayerObject.deduceHealth(final_weapon_damage)
 
