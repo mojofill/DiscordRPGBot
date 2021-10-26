@@ -716,7 +716,7 @@ async def start(ctx:commands.Context):
             data = {
                 "game":immediate_game_data,
                 "monsters":immediate_monsters_data,
-                "health":immediate_hp_data,
+                "healthpoints":immediate_hp_data,
                 "backpack":immediate_backpack_data,
                 "armor":immediate_armor_data,
                 "pets":immediate_pet_data,

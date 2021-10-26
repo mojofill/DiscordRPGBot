@@ -347,7 +347,7 @@ class Attack(commands.Cog):
                             monster_data: dict = res
                             # make an object that is not hidden in tools.py to reference to
 
-                            await tools.startMonsterAttackLoop(ctx, user, monster_rank, monster_data)
+                            await tools.startMonsterAttackLoop(ctx, user, monster_rank, monster_data, self.client)
                     
                 else: # user did not find a monster. i can choose to put something here if i want
                     pass

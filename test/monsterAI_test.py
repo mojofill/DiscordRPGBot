@@ -1,6 +1,6 @@
 import random
 import time
-import json
+from datetime import datetime, timedelta
 import threading
 from typing import Literal
 
@@ -16,16 +16,18 @@ shield_data = {
 
 monster_data = {
     "name":"mogosok",
-    "health":13,
+    "health":30,
     "attack type":"melee",
     "weapon":{
         "name":"mogo club",
         "durability":20,
-        "damage":7,
+        "damage":2,
         "attack time":0.5
     },
     "shield":shield_data,
-    "equipment type":"weapon"
+    "equipment type":"weapon",
+    "fight back countdown":15,
+    "shot probability":5 # this means one out of five times the monster decides to attack, not wait
 }
 
 def getMonsterIntelligence(monster_name: str, monster_rank: int):
@@ -50,14 +52,14 @@ def getMonsterIntelligence(monster_name: str, monster_rank: int):
 
     return random.randint(rand_range[0], rand_range[1])
 
-user_data = {"healthpoints":{"health":100,"energy":100000}}
+user_data = {"healthpoints":{"health":30,"energy":100000}}
 
 hp = user_data["healthpoints"]
 bp = {
     "weapons": { # umbrella dict containing all weapon data
         "weapons":{
             "mogo club":{
-                "damage":12,
+                "damage":2,
                 "attack time":0.5
             }
         }, # contains all the weapons the user has
@@ -97,6 +99,7 @@ class Monster:
         self.equipment_name: str = monster_data[equipment_type]["name"]
         self.equipment_durability: int = monster_data[equipment_type]["durability"]
         self.damage: int = monster_data[equipment_type]["damage"]
+        self.fightback_countdown: int = monster_data["fight back countdown"]
 
         self.equipment_broke = False
 
@@ -113,6 +116,11 @@ class Monster:
         
         else:
             self.intelligence = 4
+
+        self.times_of_attack = []
+
+        self.attack_because_player_wouldnt_move: float = time.time()
+        self.shot_probababilty: int = monster_data["shot probability"]
     
     def incrementHealth(self, amount: int):
         """Increments the given amount `amount: int` to monster's heath (`self.health`)"""
@@ -120,7 +128,7 @@ class Monster:
         self.health += amount # if to take away health amount should be negative
     
     def throwWeapon(self) -> bool:
-        """Throws the monster's weapon at the player - deals 3x damage but weapon instantly breaks"""
+        """Throws the monster's weapon at the player - deals 3x damage but weapon instantly breaks. Returns `True` if the user is killed by this blow, `False` if not"""
 
         self.enemyPlayerObject.deduceHealth(3 * self.damage)
 
@@ -135,8 +143,6 @@ class Monster:
         """Asyncronous method will starting asyncio loop that will get the monster to start attacking the user."""
 
         open_attack_chance = False # if this is set True then that means the AI thinks that this is a good time to fight the player, because his armor either broke or he is knocked down
-        
-        fightBool = True # if this becomes false then we stop the loop
 
         def getVerbOfWeaponName(weapon_name: str):
             """Returns the past tense verb that goes with the weapon name"""
@@ -149,7 +155,7 @@ class Monster:
 
             return verb_from_weapon[base_weapon_name]
 
-        while fightBool and self.health > 0:
+        while self.enemyPlayerObject.health > 0 and self.health > 0:
             if open_attack_chance: # this means the monster has decided to attack the user
                 """Code here will deal the actual damage to the user"""
 
@@ -159,15 +165,11 @@ class Monster:
                     weapon_name: str = self.wpn["name"]
                     weapon_damage: int = self.wpn["damage"]
 
-                    self.enemyPlayerObject.deduceHealth(weapon_damage)
-
                     verb = getVerbOfWeaponName(weapon_name)
 
                     msg = f'A {self.name} used its {weapon_name} and {verb} you, dealing {weapon_damage}.'
 
                     dmg = weapon_damage
-
-                    hp["health"] -= weapon_damage
 
                 except TypeError: # meaning wpn was None (meaning the equipment the monster has is a bow) and is not "subscriptable" - cannot access keys of wpn because its not a dict
                     base_bow_damage = self.bow["damage"]
@@ -177,28 +179,32 @@ class Monster:
                     dmg = base_bow_damage
 
                 self.enemyPlayerObject.deduceHealth(dmg)
+                self.equipment_durability -= 1
+
+                now = datetime.now()
+
+                hour = now.hour
+                minute = now.minute
+                second = now.second
                 
-                writeToFile(msg)
+                writeToFile(msg + f' -- {hour}:{minute}:{second} -- ' + f'monster health is {self.health}. your health is {self.enemyPlayerObject.health}')
 
                 open_attack_chance = False
+
+                self.times_of_attack.append(f'{hour}:{minute}:{second}')
             
             else:
-                """Code here will decide whether to wait for an opening, randomly (read = stupidly) try to attack or run away (this is only if the user has not attacked and only retreated for a duration of time."""
+                """Code here will decide whether to wait for an opening or randomly (read = stupidly) try to attack."""
                 
-                # how i think it should work:
-                # the monster usually waits for 3 seconds and if the user has not done anything it will attack
-                # other times it will be stupid and charge the player
-                # sometimes it will charge attack, but depending on the monster type the chances of charge attack will vary
-
-                # decide whether to wait or be stupid
                 number = random.randint(1, 50)
 
-                if number == 1: # just start attacking the user without waiting
+                if number == 1:
                     open_attack_chance = True
                     
-                    time.sleep(1) # at least sleep 1 second to give the user time to think and prepare
+                    writeToFile('about to "suddenly" attack the player - sleeping for one second to give user time to prepare?? might delete this sleep.')
+                    time.sleep(1) # might delete
 
-                    writeToFile("monster decided to suddenly attack the player")
+                    writeToFile(f"{self.name} decided to suddenly attack the player")
                 
                 else: # do NOT be stupid - try to do something smart
                     """Take in data from player and decide what the next step should be"""
@@ -209,36 +215,49 @@ class Monster:
 
                             chance = random.randint(1, 3)
 
-                            if chance in range(1, 3): # 1 or 2 - does not include 3
-                                # hit the player
+                            if chance in range(1, 3): # excludes 3
                                 open_attack_chance = True
 
-                                msg = f'A {self.name} used it\'s weapon on you, dealing {self.damage}'
+                                msg = f'monster sees you are 2 or 1 shots away from death, decided to just speed things up.'
 
                                 writeToFile(msg)
                                 
                         else: # user is not about to die
-                            # now, based on the monster's intelligence, it can notice if the user is currently in attack and attack in the perfect time
-                            if self.enemyPlayerObject.in_attack: # code below will run if the enemy player is currently in attack - else just passes
-                                if not self.intelligence <= 2: # if the monster is less than 2 then just forget about it - too dumb
-                                    if self.intelligence == 3:
-                                        number = random.randint(1, 4)
-
-                                    else:
-                                        number = random.randint(1, 3)
-
-                                    if number == 1: # if number is 1 then that means the monster has enough intelligence to spot when the player is in the middle of an attack and strike back
-                                        writeToFile("monster sees that you are currently in attack AND is smart enough to attack back.")
-                                        open_attack_chance = True
+                            # based on the monster's intelligence it can notice if the user is currently in attack and attack in the perfect time
                             
-                            else: # this means that the user is not currently in the middle of attacking - the monster can choose to attack or wait.
-                                number = random.randint(1, 50)
+                            if self.enemyPlayerObject.in_attack and self.intelligence > 2:
+                                writeToFile('monster has seen that you are in the middle of an attack')
+                                if self.intelligence == 3:
+                                    number = random.randint(1, 4)
 
-                                if number in range(1, 6):
-                                    writeToFile(f"number = {number} - monster has decided to fight you - you are not in the middle of an attack")
+                                else:
+                                    number = random.randint(1, 3)
+
+                                if number == 1: # if number is 1 then that means the monster has enough intelligence to spot when the player is in the middle of an attack and strike back
+                                    writeToFile(f"{self.name} sees that you are currently in attack AND is smart enough to attack back.")
                                     open_attack_chance = True
+                            
+                            else: # player is not in the middle of attacking - the monster can choose to attack or wait.
+                                
+                                if time.time() - self.fightback_countdown >= self.enemyPlayerObject.time_of_previous_move and time.time() - self.attack_because_player_wouldnt_move > self.attack_because_player_wouldnt_move: # more than 10 seconds have passed from the player's previous move AND since the last time the monster has had to fight the player because he or she refused to attack back
                                     
-                                time.sleep(0.8) # just so that the timing can be better
+                                    open_attack_chance = True
+
+                                    writeToFile(f'{self.name} sees that you have not done anything for 10 seconds, and will attack you.')
+
+                                    self.attack_because_player_wouldnt_move = time.time() # save the time
+
+                                else:
+                                    time.sleep(2) # it takes the monster 2 seconds to decide to attack or not
+
+                                    number = random.randint(1, self.shot_probababilty) # 1 out of 5 chance monster will attack you. should probably make this customizable
+
+                                    if number == 1:
+                                        writeToFile(f"{self.name} has decided to fight you")
+                                        open_attack_chance = True
+                                    
+                                    else:
+                                        writeToFile(f'number = {number} the monster has decided to not fight you')
                     
                     else: # monster weapon about to break - throw weapon at player to gain 3x attack damage - however weapon instant break, resorts to punching if NOT player already dead
                         player_dead = self.throwWeapon()
@@ -247,15 +266,22 @@ class Monster:
                             msg = 'you died :('
                             
                             writeToFile(msg)
-
-                            fightBool = False
             
             if self.enemyPlayerObject.health <= 0:
-                fightBool = False
-
                 msg = 'you died :('
 
                 writeToFile(msg)
+            
+        if self.health <= 0:
+            writeToFile('you have killed the monster!')
+        
+        else:
+            writeToFile(f'{self.name} has killed you...')
+
+        writeToFile('\n')
+
+        for i in self.times_of_attack:
+            writeToFile(i)
 
 class Player:
     def __init__(self):
@@ -263,11 +289,14 @@ class Player:
         self.energy = hp["energy"] # current energy the user has left
 
         self.in_attack = False
+        self.time_of_previous_move: float = time.time()
 
     def deduceHealth(self, base_damage: int) -> None:
         """Takes IN the user's armor reduction, and takes away the final damage reduce."""
 
         hp["health"] -= base_damage
+
+        self.health -= base_damage
 
     def attack(self, form: Literal["melee", "bow"], monster: Monster) -> None:
         """Takes in the form, which can only be `melee` or `bow`, and attacks the monster."""
@@ -301,6 +330,8 @@ class Player:
         # if on challenge mode, every few seconds monster wll regain health
 
         writeToFile(f'you have attacked the monster, dealing {damage}. Monster remaining health: {monster.health}')
+
+        self.time_of_previous_move = time.time()
     
 player = Player()
 
@@ -319,24 +350,22 @@ else:
     monster = Monster(player, name=name, rank=1, bow=monster_bow, shield=shield, attack_wait=attack_wait)
 
 def monsterLoopThread():
+    start = time.time()
+    writeToFile('time of attack start - ' + datetime.now().strftime('%H:%M:%S'))
+    
+    writeToFile(f'your current health: {player.health}. monster current health: {monster.health}\n')
+
     monster.startAttackLoop()
+
+    end = time.time()
+    writeToFile('\ntime ended = ' + datetime.now().strftime('%H:%M:%S'))
+    writeToFile('\nbattle time = ' + str(end - start))
 
 def getPlayerInput():
     while True:
-        time.sleep(3)
+        input('Enter to attack: ')
 
-        with open('./test/fight.json','r') as f:
-            data = json.load(f)
-        
-        fight = data["fight"]
-
-        if fight != 'a':
-            player.attack('melee', monster)
-
-            data["fight"] = 'a'
-        
-            with open('./test/fight.json','w') as f:
-                json.dump(data, f, indent=4)
+        player.attack('melee', monster)
 
 MonsterLoopThread = threading.Thread(target=monsterLoopThread)
 PlayerInputThread = threading.Thread(target=getPlayerInput)
