@@ -241,7 +241,7 @@ async def start(ctx:commands.Context):
     hp = {
         "_id":user.id,
         "health":100, # base health the user has
-        "energy":100, # base energy the user has
+        "energy":1000, # base energy the user has
         "equipped armor":{}, # holds the armor the user is currently wearing  - other armor is stored in the backpack
         "fist damage":20, # TODO decide whether to keep this
         "fist steal range":[1000,2000], #??? should i keep?
@@ -316,7 +316,14 @@ async def start(ctx:commands.Context):
             }
         },
         "weapons": { # umbrella dict containing all weapon data
-            "weapons":{}, # contains all the weapons the user has
+            "weapons":{
+                "mogo club":{
+                    "damage":2,
+                    "durability":30,
+                    "attack time":2,
+                    "energy taken":10 # player has 1000 energy
+                }
+            }, # contains all the weapons the user has
             "equipped weapon":None,
             "limit":7,
             "damage increase multiply":1
@@ -642,7 +649,6 @@ async def start(ctx:commands.Context):
             Finally, one more combat tip - the 
 
             """
-            pass
     
         async def getPlayerUsername():
             """Get the username the user wants."""
@@ -736,6 +742,8 @@ async def start(ctx:commands.Context):
         insertUserAccountInMongoDB()
         setUserAccountInDatabase()
 
+        user_data = Database.getStorageData(user)
+
         async def giveStick():
             """Give the player a stick."""
 
@@ -751,25 +759,34 @@ async def start(ctx:commands.Context):
                 description="Arrow found a stick!"
             )
 
-            give_stick_em.set_image('https://static.wikia.nocookie.net/zelda_gamepedia_en/images/4/4f/BotW_Tree_Branch_Model.png/revision/latest?cb=20201117203720')
+            give_stick_em.set_image(url='https://static.wikia.nocookie.net/zelda_gamepedia_en/images/4/4f/BotW_Tree_Branch_Model.png/revision/latest?cb=20201117203720')
 
             take_stick_em = Embed(
-                description=f'{gdata} Do you want to take the stick? React with <:regional_indicator_y:878106223839420436> or <:regional_indicator_n:878106367926349824>'
+                description='Do you want to take the stick? React with <:regional_indicator_y:878106223839420436> or <:regional_indicator_n:878106367926349824>'
             )
             
-            stick_msg: Message = await ctx.send(embed=give_stick_em)
+            await ctx.send(embed=give_stick_em)
+            stick_msg: Message = await ctx.send(embed=take_stick_em)
+
+            await stick_msg.add_reaction('🇾')
+            await stick_msg.add_reaction('🇳')
+            
+            reaction = None
 
             try:
                 def check(reaction:discord.Reaction, _user:discord.User):
-                    return _user.id == user.id and (
-                        str(reaction.emoji) == '<:regional_indicator_y:878799600360755220>' or str(reaction.emoji) == '<:regional_indicator_n:878799831143940107>') and reaction.message.id == stick_msg.id
+                    return _user.id == user.id and str(reaction.emoji) in ['🇾','🇳'] and reaction.message.id == stick_msg.id
             
-                reaction: discord.Reaction = await client.wait_for('reaction_add',check=check,timeout=30.0)[0] # this specific wait for returns (reaction, user), but we only need the reaction object so we take the first element of the tuple, which is the reaction
+                reaction: discord.Reaction = await client.wait_for('reaction_add',check=check,timeout=30.0) # this specific wait for returns (reaction, user), but we only need the reaction object so we take the first element of the tuple, which is the reaction
+
+                reaction = reaction[0]
             
             except asyncio.TimeoutError:
                 await ctx.send('You have timed out, you are not taking the stick.')
+                return
 
-            if str(reaction.emoji) == '<:regional_indicator_y:878799600360755220>': # this means the user wants to take the stick
+            # code here runs if the user has decided to take the stick, indicating that by reacting with y
+            if str(reaction.emoji) == '🇾': # this means the user wants to take the stick
                 probabilities, first_piecewise_x = tools.get_probabilities("stick")
 
                 smallest_probability = probabilities[41]
@@ -781,18 +798,19 @@ async def start(ctx:commands.Context):
                 stick_damage = None
 
                 piecewise_y = probabilities[first_piecewise_x]
-                
-                for _i in probabilities:
+
+                for _i in list(probabilities)[1:]: # excludes the first 0
                     previous_probability = probabilities[_i - 1]
                     curr_probability = probabilities[_i]
 
                     # the numbers decrease from highest to lowest, so we reverse the order in the range
 
                     if curr_probability == piecewise_y:
-                        stick_damage = random.randint(first_piecewise_x,41)
+                        stick_damage = random.randint(first_piecewise_x, 41)
                         break
 
-                    if num in range(curr_probability, previous_probability):
+                    if num >= curr_probability and num < previous_probability:
+                    # if num in range(curr_probability, previous_probability):
                         stick_damage = _i
                         break
 
@@ -800,10 +818,14 @@ async def start(ctx:commands.Context):
 
                 stick_durability = tools.getDurabilityOfWeapon(wpn_str="stick")
                 
-                bp["weapons"]["stick"] = {
+                bp = user_data["backpack"]
+
+                bp["weapons"]["weapons"]["stick"] = {
                     "name":"stick",
                     "damage":stick_damage,
-                    "durability":stick_durability
+                    "durability":stick_durability,
+                    "attack time":3,
+                    "energy taken":5
                 }
                 
                 _em = discord.Embed(description='Arrow picked the stick up')
@@ -813,29 +835,45 @@ async def start(ctx:commands.Context):
                     value=f"""
                         `Attack Power`: `{stick_damage}`
                         `Durability`: `{stick_durability}`
+                        `Attack time`: `3 seconds`
                     """
                 )
 
+                _em.add_field(name='\u200b',value='Optional: set the name of your weapon with `.rename <weapon_name> <new_weapon_name>`')
+
                 await ctx.send(embed=_em)
 
+                bp["weapons"]["equipped weapon"] = "stick"
+
                 # send a monster to attack user
+            
+            else: # user decided to not take the stick
+                em = discord.Embed(
+                    description='You have decided to not take the stick.',
+                    color=tools.lime
+                )
 
             em = Embed(
-                description="Arrow was ambushed by a monster! A Mogosok just appeared in front of Arrow! Fight back!\n\nUse `.engage` to start your fight with the Mogosok!"
+                description="Arrow was ambushed by a monster! A Mogosok just appeared in front of Arrow! Fight back!"
             )
 
             em.set_footer(text='')
             
             await ctx.send(embed=em)
 
-            # start the attack on the user            
+            # start the attack on the user
+            monster_data = await tools.spawnMonster(ctx, client, user, "mogosok", 1, block=True)
+
+            await tools.startMonsterAttackLoop(ctx, user, 1, monster_data, client)
+        
+        await giveStick()
     
     await tutorial()
 
     await ctx.send(f'{user.mention} made your account. ')
 
 @client.command()
-async def clear(ctx):
+async def clear(ctx: commands.Context):
     names = db.list_collection_names()
     for collection in names:
         if not collection == 'climate':
