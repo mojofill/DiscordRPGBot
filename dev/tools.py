@@ -195,21 +195,35 @@ class Tools:
         
         return ratio
     
-    def death_message(self, user: discord.User, death_type: Literal["monster", "player", "weather"], monster_type: str = None,weather_type: str = None) -> discord.Embed:
+    def death_message(self, user: discord.User, death_type: Literal["monster", "player", "weather"], monster_attack_type: Literal['melee', 'bow'],monster_type: str = None,weather_type: str = None) -> discord.Embed:
         """Returns a string that tells the user given that he or she has died, specifying which monster killed the user and how the user died."""
         monster_actions_past_tense = {
             "goblin":[
                 'pummeled','punched','manslaughtered','crushed','demolished','smote','struck','crushed'
+            ],
+            "mogosok":[
+                'beat','slaughtered','struck','pummeled','smote'
             ]
         }
         
         death_messages = {
             "monster":{
-                "goblin":[
-                '__user__ got __verb__ while attacking __monster__.',
-                '__monster__ __verb__ __user__, crushing __user__\'s dreams of becoming the greatest.',
-                '__user__ played themself and got __verb__ by __monster__'
-                ]
+                "goblin":{
+                    "melee":[
+                        '__user__ got __verb__ while attacking __monster__.',
+                        '__monster__ __verb__ __user__, crushing __user__\'s dreams of becoming the greatest.',
+                        '__user__ played themself and got __verb__ by __monster__'
+                    ],
+                    "bow":[
+                        '__user__ got __verb__ whilst attacking __monster__'
+                    ]
+                },
+                "mogosok":{
+                    "melee":[
+                        '__monster__ __verb__ __user__ and killed them.',
+                        '__monster__ completely wrecked __user__, __verb__ them, dealing catastrophic damage.'
+                    ]
+                }
             },
             "player":[
                 # finish this thing
@@ -983,8 +997,8 @@ class Tools:
                                         await ctx.send(f"{self.name} has decided to fight you")
                                         open_attack_chance = True
                                     
-                                    else:
-                                        await ctx.send(f'number = {number} the monster has decided to not fight you')
+                                    # else:
+                                    #     await ctx.send(f'number = {number} the monster has decided to not fight you')
                             
                             if self.enemyPlayerObject.energy <= 3 * self.enemyPlayerObject.energy_taken and self.intelligence > 3: # this means that the user cannot use more than 3 more shots before dying from low energy and the monster is smart enough to see it.
                                 # monster should wait a bit before going onto the final kill to give player time to recover - ONLY a bit AND if the monster is feeling nice = RNG
@@ -1006,9 +1020,9 @@ class Tools:
                     await ctx.send('you have killed the monster!')
                 
                 else:
-                    _msg = death_message(user, 'monster', monster_type='mogosok')
+                    em = death_message(user, 'monster', monster_type='mogosok')
                     
-                    await ctx.send(_msg)
+                    await ctx.send(embed=em)
             
         class Player:
             def __init__(self):
@@ -1197,22 +1211,35 @@ class Tools:
         else:
             monster_bow = monster_data["bow"]
             monster = Monster(player, name=name, rank=1, bow=monster_bow, shield=shield, attack_wait=attack_wait)
-        
-        # start loop for taking in user data
-        def check(m: discord.Message):
-            return m.author.id == user.id and m.channel.id == ctx.channel.id
-        
-        while game_in_session:
-            # TODO figure out a fix to replace for wait for because if my bot goes big, it cannot use wait_for anymore because verified bots have no more access to user message content
-            
-            m: discord.Message = client.wait_for('message', check=check) # this keeps getting user input as form text
 
-            commands = {
-                'attack':'attack',
-                'a':'attack'
-            }
+        async def startUserInputLoop():
+            # start loop for taking in user data
+            def check(m: discord.Message):
+                return m.author.id == user.id and m.channel.id == ctx.channel.id
+
+            while game_in_session:
+                # TODO figure out a fix to replace for wait for because if my bot goes big, it cannot use wait_for anymore because verified bots have no more access to user message content
+                
+                m: discord.Message = client.wait_for('message', check=check) # this keeps getting user input as form text
+
+                game_commands = {
+                    'attack':'attack',
+                    'a':'attack'
+                }
+
+                # check if user has changed anything since last time
+                if bp["weapons"]["equipped weapon"] != player.equipment_name:
+                    player.updatePlayerData() # update data in object
+
+                command = game_commands
+
+                if command == 'attack':
+                    # attack the monster
+
+                    await player.attack(monster)
         
         await monster.startAttackLoop()
+        await startUserInputLoop()
 
     async def spawnMonster(self, ctx: commands.Context, client: commands.Bot, user: discord.User, monster_type: str, monster_rank: int, block: bool = False) -> dict:
         """Method spawns a monster. User can either choose to engage the monster, or on rare occasions the monster will come towards to user. Returns `dict` if the monster spawn worked. Raises `MonsterSpawnFailed` if user declines if `block` is `False` (it's `False` by default) - immediately returns `dict` if `block` is `True`"""
@@ -1635,7 +1662,7 @@ class Tools:
 
         return all_quest_ids
     
-    async def deal_weather_damage(self,user,ctx):
+    async def deal_weather_damage(self, user, ctx: commands.Context):
         """
         We will only deal with direct cause and chance, because there will already be a tasks loop dealing the recurring damage to the user, we do not have to call tools.deal_weather_damage all the time for the user when he or she goes out in the rain
 
@@ -1728,7 +1755,7 @@ class Tools:
                         
                         if self.user_is_dead(user): # this retusn a True if the user has died, and False if not.
                             # add a value to the finl embed and break from loop
-                            tornado_em.add_field(name="Death",value=self.death_message(user,"weather",weather_type="tornado"))
+                            death_em = self.death_message(user, "weather", weather_type="tornado")
 
                             await ctx.send(embed=tornado_em) # send the embed right now because there is no extra things we need and we have to send it now, or else the user wont see
 
