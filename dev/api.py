@@ -6,6 +6,6 @@ load_dotenv()
 
 password = os.getenv('PASSWORD')
 
-cluster = MongoClient(f'mongodb+srv://henryzhang:{password}@cluster0.xf1re.mongodb.net/myFirstDatabase?retryWrites=true&w=majority')
+cluster = MongoClient(f'mongodb+srv://henryzhang:{password}@cluster0.xf1re.mongodb.net/myFirstDatabase?authSource=admin&replicaSet=atlas-b9ngb4-shard-0&w=majority&readPreference=primary&appname=MongoDB%20Compass&retryWrites=true&ssl=true')
 
 db = cluster.bot

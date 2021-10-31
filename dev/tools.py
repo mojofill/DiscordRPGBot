@@ -815,6 +815,8 @@ class Tools:
         hp = user_data["healthpoints"]
         bp = user_data["backpack"]
 
+        game_in_session = True
+
         def getMonsterIntelligence(monster_name: str, monster_rank: int):
             """Monster intelligence is split in these 5 ranges
                 1, 20: pretty dumb
@@ -1004,7 +1006,9 @@ class Tools:
                     await ctx.send('you have killed the monster!')
                 
                 else:
-                    await ctx.send(f'{self.name} has killed you...')
+                    _msg = death_message(user, 'monster', monster_type='mogosok')
+                    
+                    await ctx.send(_msg)
             
         class Player:
             def __init__(self):
@@ -1019,7 +1023,6 @@ class Tools:
                 # self.damage: int
                 # self.attack_time: int
                 # self.equipment_durability: int
-                # 
             
             async def setPlayerData(self) -> bool or str:
                 async def getPlayerType() -> bool or str:
@@ -1122,7 +1125,9 @@ class Tools:
             def deductHealth(self, base_damage: int) -> None:
                 """Takes IN the user's armor reduction, and takes away the final damage reduce."""
 
-                hp["health"] -= base_damage # in dict deduct health
+                final_damage = process_all_damage_reduce_func(user, base_damage)
+
+                hp["health"] -= final_damage # in dict deduct health
             
             def deductDurability(self) -> bool:
                 """Subtracts `1` to the equipment the player has. Returns `True` if equipment has broken, `False` if not."""
@@ -1194,6 +1199,18 @@ class Tools:
             monster = Monster(player, name=name, rank=1, bow=monster_bow, shield=shield, attack_wait=attack_wait)
         
         # start loop for taking in user data
+        def check(m: discord.Message):
+            return m.author.id == user.id and m.channel.id == ctx.channel.id
+        
+        while game_in_session:
+            # TODO figure out a fix to replace for wait for because if my bot goes big, it cannot use wait_for anymore because verified bots have no more access to user message content
+            
+            m: discord.Message = client.wait_for('message', check=check) # this keeps getting user input as form text
+
+            commands = {
+                'attack':'attack',
+                'a':'attack'
+            }
         
         await monster.startAttackLoop()
 
