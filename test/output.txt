@@ -1,0 +1,118 @@
+battle time = 85.45138788223267
+
+time of attack start - 18:01:11
+your current health: 30. monster current health: 30
+
+number = 4 the monster has decided to not fight you
+you have attacked the monster, dealing 2. Monster remaining health: 28
+number = 3 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 3 the monster has decided to not fight you
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:1:21 -- monster health is 28. your health is 28
+number = 5 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:1:28 -- monster health is 28. your health is 26
+number = 3 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 2 the monster has decided to not fight you
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:1:37 -- monster health is 28. your health is 24
+about to "suddenly" attack the player - sleeping for one second to give user time to prepare?? might delete this sleep.
+mogosok decided to suddenly attack the player
+A mogosok used its mogo club and struck you, dealing 2. -- 18:1:38 -- monster health is 28. your health is 22
+number = 3 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 3 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 2 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:1 -- monster health is 28. your health is 20
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:3 -- monster health is 28. your health is 18
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:6 -- monster health is 28. your health is 16
+number = 4 the monster has decided to not fight you
+number = 3 the monster has decided to not fight you
+number = 3 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+you have attacked the monster, dealing 2. Monster remaining health: 26
+number = 5 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+you have attacked the monster, dealing 2. Monster remaining health: 24
+you have attacked the monster, dealing 2. Monster remaining health: 22
+you have attacked the monster, dealing 2. Monster remaining health: 20
+mogosok has decided to fight you
+you have attacked the monster, dealing 2. Monster remaining health: 18
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:26 -- monster health is 18. your health is 14
+you have attacked the monster, dealing 2. Monster remaining health: 16
+you have attacked the monster, dealing 2. Monster remaining health: 14
+you have attacked the monster, dealing 2. Monster remaining health: 12
+mogosok has decided to fight you
+you have attacked the monster, dealing 2. Monster remaining health: 10
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:29 -- monster health is 10. your health is 12
+you have attacked the monster, dealing 2. Monster remaining health: 8
+you have attacked the monster, dealing 2. Monster remaining health: 6
+you have attacked the monster, dealing 2. Monster remaining health: 4
+you have attacked the monster, dealing 2. Monster remaining health: 2
+number = 2 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+number = 3 the monster has decided to not fight you
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:41 -- monster health is 2. your health is 10
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:44 -- monster health is 2. your health is 8
+number = 4 the monster has decided to not fight you
+about to "suddenly" attack the player - sleeping for one second to give user time to prepare?? might delete this sleep.
+mogosok decided to suddenly attack the player
+A mogosok used its mogo club and struck you, dealing 2. -- 18:2:47 -- monster health is 2. your health is 6
+number = 5 the monster has decided to not fight you
+number = 2 the monster has decided to not fight you
+number = 3 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+number = 5 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+number = 4 the monster has decided to not fight you
+number = 2 the monster has decided to not fight you
+number = 2 the monster has decided to not fight you
+mogosok has decided to fight you
+A mogosok used its mogo club and struck you, dealing 2. -- 18:3:10 -- monster health is 2. your health is 4
+monster sees you are 2 or 1 shots away from death, decided to just speed things up.
+A mogosok used its mogo club and struck you, dealing 2. -- 18:3:10 -- monster health is 2. your health is 2
+monster sees you are 2 or 1 shots away from death, decided to just speed things up.
+A mogosok used its mogo club and struck you, dealing 2. -- 18:3:11 -- monster health is 2. your health is 0
+you died :(
+mogosok has killed you...
+
+
+18:1:21
+18:1:28
+18:1:37
+18:1:38
+18:2:1
+18:2:3
+18:2:6
+18:2:26
+18:2:29
+18:2:41
+18:2:44
+18:2:47
+18:3:10
+18:3:10
+18:3:11
+
+time ended = 18:03:11
+
+battle time = 120.07347655296326

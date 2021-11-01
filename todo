@@ -1,4 +1,17 @@
 Projects:
     MONSTERS:
         ☐ Finish the monsters in tools.py getMonsterFromPlayerLevel - right now we only have mogosok @started(21-10-10 09:31)
+
         ☐ Finish the specific monster from base monster (monster rank) - right now we only have mogosok @started(21-10-10 09:44)
+
+        ☐ Finish the monster intelligence in dev > tools.py > Tools > startMonsterAttackLoop - add onto the monster intelligences - there are more monsters than just mogosok
+
+        ☐ Finish monster fightback countdowns @started(21-10-24 18:35)
+        ☐ Finish get monster shot probability (add more than mogosok) @started(21-10-24 18:40)
+    
+    ATTACK:
+        ☐ Probably should delete the `money_stolen` from every attack the user does - don't really want it in my game anymore. Do it later. @started(21-10-15 19:25)
+        
+        ☐ Decide whether to keep the `"fist damage"` value in the healthpoints (probably not) @started(21-10-16 14:43)
+
+        ☐ DO NOT KEEP `"energy regain time"` in `setup` (setting up the user's game data). Initially I thought that every user should have 100 energy, and uses it every action he or she does, and then the energy comes back slowly every second, or something like that. Instead, the user will have a large reservoir of energy, and will not regain energy every second; user will have to cook energy food and eat constantly. MEANING, i must make energy replenishing food the most common in the world.

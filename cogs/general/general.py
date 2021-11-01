@@ -1,5 +1,6 @@
 import discord,datetime,asyncio
 from discord.ext import commands
+from dev.db import Database
 from dev.tools import tools
 from dev.api import db
 from threading import Thread
@@ -82,7 +83,7 @@ class General(commands.Cog):
         
         user = ctx.author
 
-        user_data = tools.getStorageData(user)
+        user_data = Database.getStorageData(user)
         
         def update_game_thread():
             db.game.replace_one({"_id":user.id}, user_data["game"])
@@ -319,11 +320,13 @@ class General(commands.Cog):
         await ctx.send(embed=em)
 
     @commands.command(aliases=['bp'])
-    async def backpack(self,ctx,user:discord.User=None):
+    async def backpack(self, ctx:commands.Context, user:discord.User = None):
         if user == None:
             user = ctx.author
         
-        bp = db.backpack.find_one({"_id":user.id})
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
 
         # remember the implement the method that rafael suggested, 
         em = discord.Embed(color=tools.lime,title="Backpack")
@@ -336,17 +339,16 @@ class General(commands.Cog):
         
         em.add_field(name="Weapons",value="Information on all of your weapons.",inline=False)
 
-        del bp["weapons"]["equipped weapon"]
-        del bp["weapons"]["damage increase multiply"]
-        del bp["weapons"]["limit"]
-
         msg = ''
 
-        for weapon in bp["weapons"]:
+        for weapon in bp["weapons"]["weapons"]:
             msg += f"""
                 {weapon.title()}
-                Health: {bp["weapons"][weapon]["health"]}
+                Health: {bp["weapons"]["weapons"][weapon]["durability"]}
             """
+        
+        if msg == '':
+            msg = 'No weapons in `backpack`.'
 
         await ctx.send(embed=em)
 
