@@ -195,7 +195,7 @@ class Tools:
         
         return ratio
     
-    def death_message(self, user: discord.User, death_type: Literal["monster", "player", "weather"], monster_attack_type: Literal['melee', 'bow'],monster_type: str = None,weather_type: str = None) -> discord.Embed:
+    def death_message(self, user: discord.User, death_type: Literal["monster", "player", "weather"], monster_attack_type: Literal['melee', 'bow']= None, monster_type: str = None,weather_type: str = None) -> discord.Embed:
         """Returns a string that tells the user given that he or she has died, specifying which monster killed the user and how the user died."""
         monster_actions_past_tense = {
             "goblin":[
@@ -256,9 +256,9 @@ class Tools:
         if death_type == 'monster':
             past_tense_verb = random.choice(monster_actions_past_tense[monster_type])
 
-            msg = random.choice(death_messages["monster"][monster_type])
+            msg: str = random.choice(death_messages["monster"][monster_type][monster_attack_type])
 
-            msg = msg.replace('__user__',user).replace('__verb__',past_tense_verb)
+            msg = msg.replace('__user__',f'{user}').replace('__verb__',past_tense_verb).replace('__monster__', monster_type)
         
         elif death_type == 'weather':
             msg = random.choice(death_messages["weather"][weather_type]).replace('__user__',user)
@@ -268,7 +268,7 @@ class Tools:
             description=msg
         )
 
-        em.set_author(name=user, icon_url=user.avatar_url())
+        em.set_author(name=user, icon_url=user.avatar_url)
 
         return em
     
@@ -824,8 +824,6 @@ class Tools:
 
         user_data = Database.getStorageData(user)
 
-        await ctx.send(user_data.keys())
-
         hp = user_data["healthpoints"]
         bp = user_data["backpack"]
 
@@ -889,6 +887,7 @@ class Tools:
                 else:
                     self.intelligence = 4
 
+                self.last_attack: float = time.time()
                 self.attack_because_player_wouldnt_move: float = time.time()
                 self.shot_probababilty: int = monster_data["shot probability"]
             
@@ -912,6 +911,8 @@ class Tools:
             async def startAttackLoop(self):
                 """Asyncronous method will starting asyncio loop that will get the monster to start attacking the user."""
 
+                start_time: float = time.time()
+
                 open_attack_chance = False # if this is set True then that means the AI thinks that this is a good time to fight the player, because his armor either broke or he is knocked down
 
                 def getVerbOfWeaponName(weapon_name: str):
@@ -926,10 +927,15 @@ class Tools:
                     return verb_from_weapon[base_weapon_name]
 
                 while self.enemyPlayerObject.health > 0 and self.health > 0:
+                    if time.time() - self.last_attack >= 6:
+                        await ctx.send('it\'s been 6 seconds or more since the last time monster has attacked user - immediately set `open_attack_chance` to `True`, but then sleeping for 0.2 seconds')
+
+                        open_attack_chance = True
+
                     if open_attack_chance: # this means the monster has decided to attack the user
                         """Code here will deal the actual damage to the user"""
 
-                        time.sleep(self.attack_wait)
+                        await asyncio.sleep(self.attack_wait)
 
                         try:
                             weapon_name: str = self.wpn["name"]
@@ -953,6 +959,8 @@ class Tools:
                         await ctx.send(msg + f' - monster health is {self.health}. your health is {self.enemyPlayerObject.health}')
 
                         open_attack_chance = False
+
+                        self.last_attack = time.time()
                     
                     else:
                         """Code here will decide whether to wait for an opening or randomly (read = stupidly) try to attack."""
@@ -961,7 +969,7 @@ class Tools:
 
                         if number == 1:
                             open_attack_chance = True
-                            time.sleep(1) # might delete
+                            await asyncio.sleep(1) # might delete
                         
                         else: # do NOT be stupid - try to do something smart
                             """Take in data from player and decide what the next step should be"""
@@ -980,32 +988,44 @@ class Tools:
                                     open_attack_chance = True
                             
                             else: # player is not in the middle of attacking - the monster can choose to attack or wait.
+                                
+                                # NOTE - this code is UNREACHABLE because monster needs to fight every 6 seconds
                                 if time.time() - self.fightback_countdown >= self.enemyPlayerObject.time_of_previous_move and time.time() - self.attack_because_player_wouldnt_move > self.attack_because_player_wouldnt_move: # more than 10 seconds have passed from the player's previous move AND since the last time the monster has had to fight the player because he or she refused to attack back
                                     
                                     open_attack_chance = True
 
-                                    await ctx.send(f'{self.name} sees that you have not done anything for 10 seconds, and will attack you.')
-
                                     self.attack_because_player_wouldnt_move = time.time() # save the time
 
                                 else:
-                                    time.sleep(2) # it takes the monster 2 seconds to decide to attack or not
+                                    await asyncio.sleep(2) # it takes the monster 2 seconds to decide to attack or not
 
                                     number = random.randint(1, self.shot_probababilty) # 1 out of 5 chance monster will attack you. should probably make this customizable
 
-                                    if number == 1:
-                                        await ctx.send(f"{self.name} has decided to fight you")
+                                    if number == 1: # RNG says that it wants monster to attack the user
                                         open_attack_chance = True
                                     
                                     # else:
                                     #     await ctx.send(f'number = {number} the monster has decided to not fight you')
+                                
+                            index = -1
+                            
+                            if len(self.enemyPlayerObject.previous_moves) >= 3:
+                                time_between_last_3_moves: float = self.enemyPlayerObject.previous_moves[index] - self.enemyPlayerObject.previous_moves[index - 2]
+
+                                if time_between_last_3_moves >= 5: # this means that the user has not done anything for the past 5 seconds
+                                    number = random.randint(1, 3) # one out of 3 chance this will happen
+                                    
+                                    if number == 1:
+                                        time.sleep(2)
+
+                                        open_attack_chance = True
                             
                             if self.enemyPlayerObject.energy <= 3 * self.enemyPlayerObject.energy_taken and self.intelligence > 3: # this means that the user cannot use more than 3 more shots before dying from low energy and the monster is smart enough to see it.
                                 # monster should wait a bit before going onto the final kill to give player time to recover - ONLY a bit AND if the monster is feeling nice = RNG
                                 react = random.randint(1, 10)
 
                                 if react == 1:
-                                    time.sleep(2)
+                                    await asyncio.sleep(2)
 
                                     await ctx.send('monster sees that your energy level is rather low and can only afford 3 more attacks before dying from lack of energy, sleeping for 2 seconds before attacking.')
                                     
@@ -1020,9 +1040,17 @@ class Tools:
                     await ctx.send('you have killed the monster!')
                 
                 else:
-                    em = death_message(user, 'monster', monster_type='mogosok')
+                    em = death_message(user, 'monster', self.attack_type, monster_type='mogosok')
                     
                     await ctx.send(embed=em)
+                
+                end_time = time.time()
+
+                await ctx.send(f'battle time: {end_time - start_time}')
+
+                nonlocal game_in_session
+
+                game_in_session = False
             
         class Player:
             def __init__(self):
@@ -1033,10 +1061,14 @@ class Tools:
                 self.PlayerType: str = None
                 self.attack_time: int = None
 
+                self.previous_moves = [self.time_of_previous_move]
+
                 # to be built in self.setPlayerData:
                 # self.damage: int
                 # self.attack_time: int
                 # self.equipment_durability: int
+                # self.energy_taken: int
+                # self.equipment_name: str
             
             async def setPlayerData(self) -> bool or str:
                 async def getPlayerType() -> bool or str:
@@ -1091,6 +1123,8 @@ class Tools:
 
                     name: str = bp["weapons"]["weapons"][equipped_weapon]["name"]
 
+                    damage: int = bp["weapons"]["weapons"][equipped_weapon]["damage"]
+
                 else:
                     equipped_bow = bp["bows"]["equipped bow"]
 
@@ -1100,11 +1134,14 @@ class Tools:
                     energy_taken = 0
 
                     name: str = bp["bows"]["bows"][equipped_bow]["name"]
+
+                    damage: int = bp["bows"]["bows"][equipped_bow]["damage"]
                 
                 self.attack_time: float or int = attack_time
                 self.energy_taken: int = energy_taken
                 self.equipment_durability: int = durability
-                self.equipment_name = name # name of the equipment the player is using
+                self.equipment_name: str = name # name of the equipment the player is using
+                self.damage: int = damage
             
             def updatePlayerData(self, PlayerType: Literal['melee', 'bow']):
                 """When the user wants to change their selected weapon - data is changed here"""
@@ -1173,7 +1210,7 @@ class Tools:
                 
                 self.in_attack = True
                 
-                time.sleep(self.attack_time)
+                await asyncio.sleep(self.attack_time)
 
                 self.in_attack = False
 
@@ -1183,7 +1220,10 @@ class Tools:
 
                 await ctx.send(f'you have attacked the monster, dealing {self.damage}. Monster remaining health: {monster.health}')
 
-                self.time_of_previous_move = time.time() # set time in here for monster to decide whether or not to attack
+                curr_time = time.time(0)
+
+                self.time_of_previous_move = curr_time # set time in here for monster to decide whether or not to attack
+                self.previous_moves.append(curr_time)
 
                 res = self.deductDurability() # deduct durability on the player's weapon
 
@@ -1195,8 +1235,9 @@ class Tools:
                 # if not res: pass
             
         player = Player()
-
         await player.setPlayerData()
+
+        # now data is all set - game is ready to go
 
         name = monster_data["name"]
         attack_type = monster_data["attack type"]
@@ -1217,29 +1258,39 @@ class Tools:
             def check(m: discord.Message):
                 return m.author.id == user.id and m.channel.id == ctx.channel.id
 
+            await ctx.send('code should be running')
+
             while game_in_session:
                 # TODO figure out a fix to replace for wait for because if my bot goes big, it cannot use wait_for anymore because verified bots have no more access to user message content
                 
-                m: discord.Message = client.wait_for('message', check=check) # this keeps getting user input as form text
+                m: discord.Message = await client.wait_for('message', check=check) # this keeps getting user input as form text
+
+                await ctx.send('bot has registered your message')
 
                 game_commands = {
                     'attack':'attack',
                     'a':'attack'
                 }
 
+                await ctx.send(m.content)
+
                 # check if user has changed anything since last time
                 if bp["weapons"]["equipped weapon"] != player.equipment_name:
                     player.updatePlayerData() # update data in object
 
-                command = game_commands
+                try:
+                    command = game_commands[m.content]
 
-                if command == 'attack':
-                    # attack the monster
+                    if command == 'attack':
+                        # attack the monster
 
-                    await player.attack(monster)
-        
-        await monster.startAttackLoop()
-        await startUserInputLoop()
+                        await player.attack(monster)
+                    
+                except KeyError: # user input not valid command
+                    pass
+
+        await asyncio.gather(monster.startAttackLoop(), startUserInputLoop())
+        await ctx.send('will code work here?')
 
     async def spawnMonster(self, ctx: commands.Context, client: commands.Bot, user: discord.User, monster_type: str, monster_rank: int, block: bool = False) -> dict:
         """Method spawns a monster. User can either choose to engage the monster, or on rare occasions the monster will come towards to user. Returns `dict` if the monster spawn worked. Raises `MonsterSpawnFailed` if user declines if `block` is `False` (it's `False` by default) - immediately returns `dict` if `block` is `True`"""
