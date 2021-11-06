@@ -10,13 +10,6 @@ class Quests(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('Quests extension ready. ')
-    
-    def cog_check(self,ctx):
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-        if gdata["status"] == 'frozen' or gdata["status"] == 'stunned' or gdata["status"] != 'stationary':
-            return False
-        return True
 
     @commands.command(name='quests',aliases=['quest,','qt'])
     async def _quests(self,ctx):

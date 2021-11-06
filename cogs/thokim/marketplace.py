@@ -390,37 +390,49 @@ class Marketplace(commands.Cog):
             # add limit to how many weapons user's backpack can store
 
             # check if all the weapons PLUS the one they're about to buy is above the limit amount of weapons the user's backpack can hold
-            if len(bp["weapons"]["weapons"].keys()) + 1 > bp["weapons"]["limit"]:
-                await ctx.send(f'You do not have enough space in your backpack to store {weapon}. Use `.store <item>` to store your weapon in your vault.')
+            if len(bp["weapons"]["weapons"]) + 1 > bp["weapons"]["limit"]:
+                await ctx.send(f'You do not have enough space in your backpack to store {weapon}. Use `.store <item>` to store your weapon in your vault.\n Your weapons are {list(bp["weapons"]["weapons"].keys())}. Space limit is {bp["weapons"]["limit"]}.\n{bp["weapons"]["weapons"]}')
                 return
             
             # function for getting the name of the weapon, whether default or the user wants to name it
             # making a function because recursion if the user makes a mistake. easier to make and use than a while loop, dont judge me
+
+            class CustomError(Exception):
+                pass
+            
             async def get_name():
                 name = None
-                def check(message): # check for client.wait_for()
-                    return message.channel == ctx.channel and message.author == ctx.author
-                
-                await ctx.send('Do you want to name your weapon? (Y/N)')
+
+                nonlocal weapon
+            
+                m: discord.Message = await ctx.send('Do you want to name your weapon? (Y/N)')
+
+                await m.add_reaction('🇾')
+                await m.add_reaction('🇳')
+
+                def check(reaction: discord.Reaction, _user: discord.User): # check for client.wait_for()
+                    return _user.id == user.id and reaction.message.id == m.id and reaction.emoji in ['🇾','🇳']
 
                 # boolean to know if the user has beaten the clock and sent the message before the timeout error from asyncio
                 user_has_replied = False
 
                 try:
-                    # get the message from the user
-                    msg: discord.Message = await self.client.wait_for('message',check=check,timeout=20)
+                    # get reaction from the user
+                    reaction, _user = await self.client.wait_for('reaction_add',check=check,timeout=20)
+
+                    reaction: discord.Reaction
+
                     # if code gets here that means user has sent a message
                     user_has_replied = True
                 
                 # if code reaches here that means the user has timed out
                 except asyncio.TimeoutError:
                     await ctx.send(f'You have timed out, please try again with `.buy <{item_id}>`')
-                    return
+                    raise CustomError
 
                 # user has beaten the clock and sent the message before asyncio timeout error
 
                 if user_has_replied:
-                    # this function gives the default weapon name of a weapon, changed from default is there is already a weapon named that
                     def give_default_weapon_name():
                         # the "dedault" weapon name does NOT yet have a "|" to show which weapon number it is. the name might be misleading
                         default_weapon_name = weapon
@@ -429,7 +441,7 @@ class Marketplace(commands.Cog):
                         found_copy_of_name = False
 
                         # go through all the weapons in bp_copy because bp_copy does not have keys that are not weapons
-                        for weapon_name in bp["weapons"]["weapon"]:
+                        for weapon_name in bp["weapons"]["weapons"]:
                             # compare the actual name of the weapon, instead of the reference that the computer has to reference to
                             if bp["weapons"]["weapons"][weapon_name]["name"] == weapon:
                                 # set this as true to tell later on we've already update and set a default weapon name
@@ -444,7 +456,7 @@ class Marketplace(commands.Cog):
                                 # new weapon name returned will be the weapon_name, which is what kind of weapon it is, sword, club etc.
                                 # when replaced, the new weapon name will look like (example weapon as sword)
                                 # sword|3
-                                default_weapon_name = weapon_name.replace(weapon_number,new_weapon_number)
+                                default_weapon_name = weapon_name.replace(str(weapon_number),str(new_weapon_number))
 
                                 # we've found the weapon name, so we can break to reduce time
                                 break
@@ -452,19 +464,19 @@ class Marketplace(commands.Cog):
                         # this is the first weapon of its kind in the user's backpack, so no copies were found
                         if found_copy_of_name == False:
                             # just slap a "1" on the end because its the first one
-                            default_weapon_name += "1"
+                            default_weapon_name += "|1"
                         
                         return default_weapon_name
 
                     # user replies YES
-                    if msg.content.lower() == 'y':
+                    if reaction.emoji == '🇾':
                         await ctx.send('What do you want to name your weapon? (Characters limit = 15).')
                         
                         # another boolean to check if user has beaten the second clock, asking what the user wants the weapon name to be
                         user_has_replied_what_weapon_name_is = False
 
                         try:
-                            name = await self.client.wait_for('message',check=check)
+                            name: discord.Message = await self.client.wait_for('message',check=check)
                             # user has said what they want the weapon name to be, so the bool to true
                             user_has_replied_what_weapon_name_is = True
 
@@ -492,7 +504,7 @@ class Marketplace(commands.Cog):
                                 await get_name()
                     
                     # user replies NO
-                    elif msg.content.lower() == 'n':
+                    elif reaction.emoji == '🇳':
                         default_weapon_name = give_default_weapon_name()
 
                         name = default_weapon_name
@@ -503,12 +515,17 @@ class Marketplace(commands.Cog):
                     else:
                         await ctx.send('❌ Invalid answer. Acceptable answer as as follows: Y/N.')
                         # recursive loop - the user has made a mistake the return the user back to the beginning of the function
+
                         await get_name()
                     
                     # returns the name of the weapon
                     return name
 
-            name = await get_name()
+            try:
+                name = await get_name()
+            except CustomError: # raises error when user times out
+                await ctx.send('timed out so function return')
+                return # return so no more code is ran - user will have to use command again
 
             await ctx.send(f'This is your name {name}.')
             
@@ -606,7 +623,7 @@ class Marketplace(commands.Cog):
             weapon_info = weapons[weapon]
 
             # set the weapon in the backpack as dict above
-            bp["weapons"]["weapons"] = weapon_info
+            bp["weapons"]["weapons"][name] = weapon_info
 
             # dock money from user's balance
             bp["gold bars"] -= price * amount

@@ -2,10 +2,10 @@ import asyncio
 import discord,random
 from discord.ext import commands
 from dev.tools import tools
-from dev.api import db
 from dev.db  import Database
 from cogs.thokim.falcon import hunt
 from dev.map import Map
+from dev.monster_tools import monster_tools
 
 class Attack(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -51,7 +51,7 @@ class Attack(commands.Cog):
 
         # refence dev.tools for more information on the code below
 
-        msg = tools.all_quest_and_chest_actions(ctx,'coinflip',user)
+        msg = monster_tools.all_quest_and_chest_actions(ctx,'coinflip',user)
 
         await ctx.send(msg)
 
@@ -92,7 +92,7 @@ class Attack(commands.Cog):
         ))
     
     @commands.command(aliases=['nwpn'])
-    async def nameweapon(self, ctx: commands.Context, prev_wpn_name: str, wpn_name: str):
+    async def rename(self, ctx: commands.Context, prev_wpn_name: str, wpn_name: str):
         """Finds the weapon with name `prev_wpn_name` and sets it's name as `wpn_name`, so long there is not already a weapon with name `wpn_name`."""
 
         user = ctx.author
@@ -105,7 +105,7 @@ class Attack(commands.Cog):
             if bp["weapons"][wpn_key]["name"] == wpn_name:
                 await ctx.send(embed=discord.Embed(
                     title='Same Weapon Name Found',
-                    description='Argument for `<wpn_name>` "{wpn_name}" was found in your backpack - please select another name.'
+                    description=f'Argument for `<wpn_name>` "{wpn_name}" was found in your backpack - please select another name.'
                 ))
 
                 return
@@ -320,43 +320,46 @@ class Attack(commands.Cog):
 
             current_cord = spawnCoord
             
-            while True: # this is for the monster loop
-                foundMonster = random.randint(1, 10)
+            loop = True
 
-                if foundMonster == 1:
-                    aloneOrMonsterCamp = random.randint(1, 50)
+            while loop: # this is for the monster loop
+                aloneOrMonsterCamp = random.randint(1, 50)
 
-                    if aloneOrMonsterCamp == 50: # RNG decides that the user can fight a whole monster camp!
-                        pass
-                
-                    else: # RNG says that the user can only fight a singular monster
-                        gdata = user_data["game"]
-
-                        base_monster, monster_rank = tools.getMonsterFromPlayerLevel(gdata["level"])
-
-
-                        try:                    
-                            monster_data = await tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank) # will spawn a monster, ask user is they want to engage it, and start the fight between the user and the monster if yes or the monster decides to engage
-
-                            await ctx.send(f'your current coordinate is {current_cord}')
-
-                            # now we can start accepting user commands
-
-                            await tools.startMonsterAttackLoop(ctx, user, monster_rank, monster_data, self.client)
-
-                        except: # user has declined to fight monster
-                            pass # move onto next monster - dont do anything and continue loop
-                    
-                else: # user did not find a monster. i can choose to put something here if i want
+                if aloneOrMonsterCamp == 50: # RNG decides that the user can fight a whole monster camp!
                     pass
             
-                while True: # while loop for ONE of the next coords
-                    x = random.randint(current_cord[0] - radius, current_cord[0] + radius)
-                    y = random.randint(current_cord[1] - radius, current_cord[1] + radius)
+                else: # RNG says that the user can only fight a singular monster
+                    gdata = user_data["game"]
+
+                    base_monster, monster_rank = monster_tools.getMonsterFromPlayerLevel(gdata["level"])
+
+                    try:
+                        monster_data = await monster_tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank) # will spawn a monster, ask user is they want to engage it, and start the fight between the user and the monster if yes or the monster decides to engage
+
+                        await ctx.send(f'your current coordinate is {current_cord}')
+
+                        # now we can start accepting user commands
+
+                        await monster_tools.startMonsterAttackLoop(ctx, user, monster_rank, monster_data, self.client)
+
+                    except monster_tools.MonsterSpawnFailed: # user has declined to fight monster
+                        pass # move onto next monster - dont do anything and continue loop
                 
-                    if abs(x - current_cord[0]) + abs(y - current_cord[1]) <= radius:
-                        current_cord = (x, y)
-                        break
+            else: # user did not find a monster. i can choose to put something here if i want
+                pass
+        
+            while True: # while loop for ONE of the next coords
+                x = random.randint(current_cord[0] - radius, current_cord[0] + radius)
+                y = random.randint(current_cord[1] - radius, current_cord[1] + radius)
+
+                a = abs(x - current_cord[0]) + abs(y - current_cord[1])
+                b = abs(x - current_cord[0])
+                c = abs(y - current_cord[1])
+
+                if abs(x - current_cord[0]) + abs(y - current_cord[1]) <= radius:
+                    current_cord = (x, y)
+                    loop = False
+                    break
         
         elif target == 'prey':
             """Start prey loop"""

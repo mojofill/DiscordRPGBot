@@ -13,6 +13,8 @@ storages = {}
 for user_data in gdata:
     user_id = user_data["_id"]
 
+    user_data["status"] = "stationary"
+
     user_stored_data = {
         "game":user_data
     }
@@ -30,8 +32,10 @@ for user_data in gdata:
         def get_monsters():
             monsters_dict = db.monsters.find_one({"_id":user_id})
 
-            monsters_dict["engaged monsters"] = {} # set the active monsters to none
-
+            monsters_dict["engaged monster"] = None
+            monsters_dict["preview monster"] = None
+            monsters_dict["hunt loop"] = False
+            
             user_stored_data["monsters"] = monsters_dict
         
         def get_pets():

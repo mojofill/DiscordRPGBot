@@ -10,13 +10,6 @@ class Mines(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('Mines extension loaded.')
-    
-    def cog_check(self,ctx):
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-        if gdata["status"] == 'frozen' or gdata["status"] == 'stunned' or gdata["status"] != 'stationary':
-            return False
-        return True
 
     @commands.command(aliases=['s'])
     @commands.cooldown(1,1,commands.BucketType.user)

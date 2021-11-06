@@ -11,10 +11,18 @@ class Monsters(commands.Cog):
         self.client = client
     
     @commands.command()
-    async def monsterinfo(self, ctx: commands.Context, monster_type: str):
+    async def monster(self, ctx: commands.Context):
         """Tells the user about the specific monster they asked for."""
 
         em = discord.Embed()
+    
+    @commands.command()
+    async def engage(self, ctx: commands.Context):
+        pass
+
+    @commands.command()
+    async def skip(self, ctx: commands.Context):
+        pass
 
 def setup(client: commands.Bot):
     client.add_cog(Monsters(client))

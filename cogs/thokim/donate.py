@@ -11,20 +11,6 @@ class Donate(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('Donatation extension ready. ')
-    
-    def cog_check(self,ctx):
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-        if gdata["status"] == 'frozen' or gdata["status"] == 'stunned' or gdata["status"] != 'stationary':
-            return False
-        return True
-    
-    async def cog_command_error(self,ctx,error):
-        if isinstance(error,commands.CheckFailure):
-            pass
-                
-        else:
-            raise error
 
     # remember that you can get one time recievement of credits from paying through paypal. gotta make it unfair so people choose patron
 
