@@ -210,6 +210,7 @@ class Attack(commands.Cog):
             await ctx.send(f'{user.mention} You have selected {target}')
 
         user_data = Database.getStorageData(user)
+        monsters = user_data["monsters"]
         
         if target == 'monster':
             """Start monster loop"""
@@ -308,8 +309,6 @@ class Attack(commands.Cog):
                 await ctx.send(f"{user.mention} Entered hunting loop! You have spawned in the {environment[2:]}")
 
             # you can either find an alone monster, or a monster camp which basically works like a dungeon
-            async def engageMonster(monster_type: str) -> None:
-                pass
 
             spawnCoordX = random.randint(-500, 500)
             spawnCoordY = random.randint(-250, 250)
@@ -333,17 +332,11 @@ class Attack(commands.Cog):
 
                     base_monster, monster_rank = monster_tools.getMonsterFromPlayerLevel(gdata["level"])
 
-                    try:
-                        monster_data = await monster_tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank) # will spawn a monster, ask user is they want to engage it, and start the fight between the user and the monster if yes or the monster decides to engage
+                    monster_data = await monster_tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank)
 
-                        await ctx.send(f'your current coordinate is {current_cord}')
+                    # now we can start accepting user commands
 
-                        # now we can start accepting user commands
-
-                        await monster_tools.startMonsterAttackLoop(ctx, user, monster_rank, monster_data, self.client)
-
-                    except monster_tools.MonsterSpawnFailed: # user has declined to fight monster
-                        pass # move onto next monster - dont do anything and continue loop
+                    monsters["preview"] = monster_data
                 
             else: # user did not find a monster. i can choose to put something here if i want
                 pass

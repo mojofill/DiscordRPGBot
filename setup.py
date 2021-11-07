@@ -436,7 +436,8 @@ async def start(ctx:commands.Context):
         # "engaged monster":{}, # this is for the engaged monsters that are targetting and attacking the user
         "hunt loop":False, # if this is False then hunting loop is stopped - else hunting loop should be continued
         "total monsters defeated":0,
-        "trophies":0
+        "trophies":0,
+        "previous moves":[] # clear this after every monster fight
     }
 
     mines = { # currently users are default given a mineshaft - later on you have to buy the mineshaft, and you have to be a certain level on xp

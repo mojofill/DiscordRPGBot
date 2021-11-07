@@ -165,9 +165,9 @@ class Tools:
             
         return probabilities, piecewise_first_x
     
-    async def addEquipment(self, ctx: commands.Context, user: discord.User, equipment_name: str, attack_type: str, usable_with_shield: bool = True) -> dict:
+    async def addEquipment(self, ctx: commands.Context, user: discord.User, equipment_name: str, attack_type: str, shield_compatible: bool = True) -> dict:
         """
-        `usable_with_shield` defaults `True`. Two handed weapons and all bows are not usable with shield.
+        `shield_compatible` defaults `True`. Two handed weapons and all bows are not usable with shield.
 
         Returns a `dict` containing all the weapon information:
         ```
@@ -175,7 +175,8 @@ class Tools:
         "durability":int
         "attack time":int
         "attack type":str
-        "energy taken":int # how much energy is taken from user each time they use this equipment - NOTE: bows take NO energy
+        "energy taken":int # NOTE: bows take NO energy
+        "shield compatible":bool
         ```
 
         NOTE - weapons are not finished. Finish adding weapons to weapon_stats
@@ -189,20 +190,20 @@ class Tools:
                 "durability":[5, 10],
                 "attack time":0.3,
                 "attack type":attack_type,
-                "energy taken":1
+                "energy taken":1,
+                "shield compatible":True
             },
             "mogo club":{
                 "damage":[5, 10],
                 "durability":[20, 30],
                 "attack time":0.3,
                 "attack type":attack_type,
-                "energy taken":2
+                "energy taken":2,
+                "shield compatible":True
             }
         }
 
         stats = weapon_stats[equipment_name]
-
-        Database
 
         user_data = Database.getStorageData(user)
 

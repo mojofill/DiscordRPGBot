@@ -8,10 +8,11 @@ Hunting monsters is easy in this game. All a player has to do is type `.hunt`. R
 In `setup.py`, RPG Bot sets the `monster` section as
 ```py
 {
-    "_id":user.id,
-    "preview monster":{},
-    "total monsters defeated":0,
-    "trophies":0
+    "_id":int,
+    "preview monster":dict,
+    "engaged monster":dict,
+    "total monsters defeated":int,
+    "trophies":int
 }
 ```
 
