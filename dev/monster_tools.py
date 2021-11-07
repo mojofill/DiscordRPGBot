@@ -803,7 +803,7 @@ class _monster_tools():
                 elemental = getWeaponElemental(name)
             
             else:
-                equipment_type = 'bowh'
+                equipment_type = 'bow'
 
                 elemental = getArrowElemental(arrow)
 
