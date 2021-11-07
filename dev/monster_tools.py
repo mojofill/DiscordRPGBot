@@ -514,7 +514,7 @@ class _monster_tools():
                 """Read the `__doc__` of `getWpnData`, but replace weapon with bow and you get the gist."""
 
                 # TODO finish all the bows in here
-
+                # TODO finish the arrow probabilites IMPORTANT i need this very much
                 bow_data_dict = {
                     "mogo bow":{
                         "durability":{
@@ -528,6 +528,17 @@ class _monster_tools():
                             2:[15,23],
                             3:[25,30],
                             4:[32,41]
+                        },
+                        "arrow probability":{ # out of 100
+                            1:{
+                                (1, 100):"arrow" # if it's just "arrow" then it's a regular arrow
+                            },
+                            2:{
+                                (1, 95):"arrow",
+                                (96, 97):"shock arrow",
+                                (97, 98):"fire arrow",
+                                (98, 99):"ice arrow"
+                            }
                         }
                     }
                 }
@@ -549,7 +560,14 @@ class _monster_tools():
 
                 new_bow_name = new_bow_name_dict[base_bow_name][monster_rank]
 
-                return bow_durability, bow_damage, new_bow_name
+                number = random.randint(1, 100)
+
+                for arrow_chance in bow_data_dict[base_bow_name]["arrow probability"][monster_rank]:
+                    if number in range(arrow_chance[0], arrow_chance[1]):
+                        arrow: str = bow_data_dict[base_bow_name]["arrow probability"][monster_rank][arrow_chance]
+                        break
+
+                return bow_durability, bow_damage, new_bow_name, arrow
             
             def getShieldData():
                 monster_shields = {
@@ -719,17 +737,45 @@ class _monster_tools():
 
                 return shot_probabilities[base_monster]
             
-            def getWeaponElemental(wepaon_name: str) -> bool:
-                """If weapon is elemental, returns `True`. If not then `False`"""
+            def getWeaponElemental(weapon_name: str) -> bool:
+                """If weapon is elemental, returns `True` else `False`"""
                 
                 elemental_weapons = [
-                    ''
+                    'lightning staff',
+                    'blaze staff',
+                    'ice staff'
                 ]
+
+                if weapon_name in elemental_weapons:
+                    return True
+                
+                return False
+            
+            def getArrowElemental(arrow_name: str) -> bool:
+                """If an arrow is elemental, returns `True` else `False."""
+
+                elemental_arrows = [
+                    'shock arrow',
+                    'fire arrow',
+                    'ice arrow'
+                ]
+
+                if arrow_name in elemental_arrows:
+                    return True
+
+                return False
 
             # code below gets the monster data
             monster_health = getMonsterHealth()
+
+            arrow = None # to avoid error later on such as no variable named 'arrow'
             
-            durability, damage, base_equipment_name, name, monster_attack_type = getMonsterEquipmentData() # monster attack type is the type of equipment the monster is using - weapon or bow
+            try:
+                durability, damage, base_equipment_name, name, monster_attack_type, arrow = getMonsterEquipmentData() # monster attack type is the type of equipment the monster is using - weapon or bow
+            
+            except ValueError: # not enough values to unpack - no arrows
+                durability, damage, base_equipment_name, name, monster_attack_type = getMonsterEquipmentData() # monster attack 
+
             shield_durability, shield_knockback, shield_name = getShieldData()
 
             if monster_attack_type == 'bow':
@@ -753,9 +799,13 @@ class _monster_tools():
 
             if monster_attack_type == 'melee':
                 equipment_type = 'weapon'
+
+                elemental = getWeaponElemental(name)
             
             else:
                 equipment_type = 'bow'
+
+                elemental = getArrowElemental(arrow)
 
             new_monster_data = {
                 "name":monster_type,
@@ -766,7 +816,8 @@ class _monster_tools():
                     "durability":durability,
                     "damage":damage,
                     "attack time":attack_time,
-                    "elemental":elemental
+                    "elemental":elemental,
+                    "elemental type":
                 },
                 "shield":shield_data,
                 "equipment type":equipment_type,
