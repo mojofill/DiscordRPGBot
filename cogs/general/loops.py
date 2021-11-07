@@ -9,8 +9,8 @@ class Loops(commands.Cog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        self.add_items.start()
-        self.add_mining_speed.start()
+        # self.add_items.start()
+        # self.add_mining_speed.start()
         self.change_daily_quests.start()
         self.hourly_shipments.start()
         self.daily_shipments.start()

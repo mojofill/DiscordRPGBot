@@ -93,12 +93,10 @@ class Monster:
 
         self.health: int = monster_data["health"]
         self.attack_type: str = monster_data["attack type"]
-
-        equipment_type: str = monster_data["equipment type"]
         
-        self.equipment_name: str = monster_data[equipment_type]["name"]
-        self.equipment_durability: int = monster_data[equipment_type]["durability"]
-        self.damage: int = monster_data[equipment_type]["damage"]
+        self.equipment_name: str = monster_data["equipment"]["name"]
+        self.equipment_durability: int = monster_data["equipment"]["durability"]
+        self.damage: int = monster_data["equipment"]["damage"]
         self.fightback_countdown: int = monster_data["fight back countdown"]
 
         self.equipment_broke = False
@@ -339,7 +337,7 @@ name = monster_data["name"]
 attack_type = monster_data["attack type"]
 equipment_type = monster_data["equipment type"]
 shield = monster_data["shield"]
-attack_wait = monster_data[equipment_type]["attack time"] # the time it takes for a single attack
+attack_wait = monster_data["equipment"]["attack time"] # the time it takes for a single attack
 
 if attack_type == 'melee':
     monster_wpn = monster_data["weapon"]

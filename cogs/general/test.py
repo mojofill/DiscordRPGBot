@@ -13,15 +13,24 @@ class Test(commands.Cog):
     
     @commands.command()
     async def test(self, ctx: commands.Context):
-        m: discord.Message = await ctx.send('Starting Message Listening Loop...')
+        user = ctx.author
 
-        def check(m: discord.Message):
-            return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
+        save = None
+
+        def check(reaction: discord.Reaction, _user: discord.User):
+            nonlocal save
+
+            save = reaction.emoji
+
+            return True
+
+        m: discord.Message = await ctx.send('React to this message with 👍.')
+
+        await m.add_reaction('👍')
         
-        await m.edit('Loop Started.')
+        await self.client.wait_for("reaction_add", check=check)
 
-        while True:
-            m: discord.Message = await self.client.wait_for('message', check=check)
+        await ctx.send(save)
 
     @commands.command(aliases=['print'])
     async def _print(self, ctx: commands.Context):

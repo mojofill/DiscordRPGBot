@@ -1,4 +1,8 @@
-"""On line 126 of cogs.thokim.boosts, we set a key,value pair with ID as a pair, and that id is an integer, which is not BSONSerializable. Change later if need be."""
+"""
+On line 126 of cogs.thokim.boosts, we set a key,value pair with ID as a pair, and that id is an integer, which is not BSONSerializable. Change later if need be.
+
+As a reminder, before you publish this bot go to global search and search TODO to find all the things still need to be done
+"""
 
 import discord
 import datetime
@@ -81,7 +85,7 @@ async def user_not_frozen(ctx:commands.Context):
 
 @client.event
 async def on_command_error(ctx:commands.Context,error):
-    if isinstance(error,commands.CheckFailure):
+    if isinstance(error, commands.CheckFailure):
         await ctx.send('Error occured - check terminal.')
         
         user: discord.User = ctx.author
@@ -317,7 +321,8 @@ async def start(ctx:commands.Context):
         },
         "weapons": { # umbrella dict containing all weapon data
             "weapons":{
-                "mogo club":{
+                "mogo club|1":{
+                    "name":"mogo club",
                     "damage":2,
                     "durability":30,
                     "attack time":2,
@@ -427,10 +432,12 @@ async def start(ctx:commands.Context):
 
     monsters = {
         "_id":user.id,
-        "engaged monsters":{}, # this is for the engaged monsters that are targetting and attacking the user
+        "preview monster":{},
+        # "engaged monster":{}, # this is for the engaged monsters that are targetting and attacking the user
+        "hunt loop":False, # if this is False then hunting loop is stopped - else hunting loop should be continued
         "total monsters defeated":0,
-        "suspecting monsters":{}, # monsters in here are just noticing the user, suspecting that the person they see is in fact a human, and monsters love killing humans. They will wait for their "suspicion meter" to fill up before unfreezing and attacking the user
-        "trophies":0
+        "trophies":0,
+        "previous moves":[] # clear this after every monster fight
     }
 
     mines = { # currently users are default given a mineshaft - later on you have to buy the mineshaft, and you have to be a certain level on xp
@@ -751,7 +758,7 @@ async def start(ctx:commands.Context):
                 description="Arrow walkeS outside of the temple, getting fresh air after a decade of sleeping in the Temple of Power..."
             )
 
-            msg = await ctx.send(embed=walk_to_outside_em)
+            await ctx.send(embed=walk_to_outside_em)
 
             await asyncio.sleep(3)
 
@@ -787,61 +794,35 @@ async def start(ctx:commands.Context):
 
             # code here runs if the user has decided to take the stick, indicating that by reacting with y
             if str(reaction.emoji) == '🇾': # this means the user wants to take the stick
-                probabilities, first_piecewise_x = tools.get_probabilities("stick")
+                await tools.addEquipment(ctx, user, "stick", "melee")
 
-                smallest_probability = probabilities[41]
+                # damage = stick_stats["damage"]
+                # durability = stick_stats["durability"]
+                # attack_time = stick_stats["attack time"]
+                # energy_taken = stick_stats["energy taken"]
+
+                # bp["weapons"]["weapons"]["stick"] = {
+                #     "name":"stick",
+                #     "damage":stick_damage,
+                #     "durability":stick_durability,
+                #     "attack time":3,
+                #     "energy taken":5
+                # }
                 
-                smallest_power_of_ten = int(str(smallest_probability).split('e')[1]) # this splits the str version of probability into 2 by the letter 'e', and gets the int version number after 'e'
+                # _em = discord.Embed(description='Arrow picked the stick up')
 
-                num = random.randint(1,10 ** -smallest_power_of_ten) 
+                # _em.add_field(
+                #     name="Stick Attributes",
+                #     value=f"""
+                #         `Attack Power`: `{stick_damage}`
+                #         `Durability`: `{stick_durability}`
+                #         `Attack time`: `3 seconds`
+                #     """
+                # )
 
-                stick_damage = None
+                # _em.add_field(name='\u200b',value='Optional: set the name of your weapon with `.rename <weapon_name> <new_weapon_name>`')
 
-                piecewise_y = probabilities[first_piecewise_x]
-
-                for _i in list(probabilities)[1:]: # excludes the first 0
-                    previous_probability = probabilities[_i - 1]
-                    curr_probability = probabilities[_i]
-
-                    # the numbers decrease from highest to lowest, so we reverse the order in the range
-
-                    if curr_probability == piecewise_y:
-                        stick_damage = random.randint(first_piecewise_x, 41)
-                        break
-
-                    if num >= curr_probability and num < previous_probability:
-                    # if num in range(curr_probability, previous_probability):
-                        stick_damage = _i
-                        break
-
-                # and now we have the stick damage
-
-                stick_durability = tools.getDurabilityOfWeapon(wpn_str="stick")
-                
-                bp = user_data["backpack"]
-
-                bp["weapons"]["weapons"]["stick"] = {
-                    "name":"stick",
-                    "damage":stick_damage,
-                    "durability":stick_durability,
-                    "attack time":3,
-                    "energy taken":5
-                }
-                
-                _em = discord.Embed(description='Arrow picked the stick up')
-
-                _em.add_field(
-                    name="Stick Attributes",
-                    value=f"""
-                        `Attack Power`: `{stick_damage}`
-                        `Durability`: `{stick_durability}`
-                        `Attack time`: `3 seconds`
-                    """
-                )
-
-                _em.add_field(name='\u200b',value='Optional: set the name of your weapon with `.rename <weapon_name> <new_weapon_name>`')
-
-                await ctx.send(embed=_em)
+                # await ctx.send(embed=_em)
 
                 bp["weapons"]["equipped weapon"] = "stick"
 
@@ -866,7 +847,7 @@ async def start(ctx:commands.Context):
 
             await tools.startMonsterAttackLoop(ctx, user, 1, monster_data, client)
         
-        await giveStick()
+        # await giveStick()
     
     await tutorial()
 

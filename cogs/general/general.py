@@ -13,25 +13,6 @@ class General(commands.Cog):
     async def on_ready(self):
         print('General (about bot) extension ready. ')
     
-    def cog_check(self,ctx):
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-        if gdata["status"] == 'frozen':
-            return False
-        return True
-    
-    async def cog_command_error(self,ctx,error):
-        if isinstance(error,commands.CheckFailure):
-            if ctx.command.name == 'phelp':
-                if len(ctx.args) == 0:
-                    await self.phelp(ctx)
-                
-                else:
-                    self.phelp(ctx,ctx.command.args[0])
-                
-        else:
-            raise error
-    
     # making the help command phelp because i still want to the default help command, because it lists all the commands and when i want to test all the commands i can use the default help command
     @commands.command()
     async def phelp(self,ctx,aspect=None):
@@ -81,11 +62,13 @@ class General(commands.Cog):
 
         msg: discord.Message = await ctx.send('Updating your account...')
         
-        user = ctx.author
+        user: discord.User = ctx.author
 
         user_data = Database.getStorageData(user)
         
         def update_game_thread():
+            user_data["game"]["status"] = 'stationary'
+            
             db.game.replace_one({"_id":user.id}, user_data["game"])
         
         def update_backpack_thread():
@@ -190,21 +173,17 @@ class General(commands.Cog):
         await ctx.send(embed=em)
 
     @commands.command()
-    async def profile(self,ctx,user:discord.User=None):
+    async def profile(self, ctx: commands.Context, user:discord.User=None):
         if user == None:
             user = ctx.author
 
-        gdata = db.game.find_one({"_id":user.id})
-        bp = db.backpack.find_one({"_id":user.id})
-        mines = db.mines.find_one({"_id":user.id})
-        desert = db.desert.find_one({"_id":user.id})
-        coliseum = db.coliseum.find_one({"_id":user.id})
-        pets = db.pets.find_one({"_id":user.id})
-        boosts = db.boosts.find_one({"_id":user.id})
+        user_data = Database.getStorageData(user)
 
-        rank_system = {
-        "miner":tools.lime
-        }
+        gdata = user_data["game"]
+        bp = user_data["backpack"]
+        coliseum = user_data["coliseum"]
+        pets = user_data["pets"]
+        boosts = user_data["boosts"]
 
         """
         Important bot aspects:
@@ -224,7 +203,7 @@ class General(commands.Cog):
 
         """
         
-        em = discord.Embed(color=rank_system[mines["business level"]])
+        em = discord.Embed()
 
         em.set_thumbnail(url=user.avatar_url)
 
@@ -234,24 +213,14 @@ class General(commands.Cog):
         em.set_footer(text=self.client.user,icon_url=self.client.user.avatar_url)
 
         em.add_field(name="Game",value=f"""
+        Level: **{gdata["level"]}**
+        XP: **{gdata["experience"]}**
         Status: **{gdata["status"].title()}**
         Location: **{gdata["location"].title()}**
         """)
 
         em.add_field(name="Currency",value=f"""
         Gold bars: **{bp["gold bars"]}**
-        """)
-
-        em.add_field(name='Tools',value=f'Information on {user.name}\'s tools.',inline=False)
-
-        em.add_field(name="Pickaxe",value=f"""
-        Level {mines["pickaxe"]["level"]}
-        Mining speed: {mines["pickaxe"]["original mining speed"]}
-        """)
-
-        em.add_field(name="Wagon",value=f"""
-        Level {mines["wagon"]["level"]}
-        Size: {mines["wagon"]["original limit"]}
         """)
 
         total_pets = 0
@@ -279,33 +248,6 @@ class General(commands.Cog):
         if active_potion_boosts == '':
             active_potion_boosts = f'No active potions. Use `.consume` to use potion.'
 
-        engaged_monsters = ''
-        for monster_id in desert["monsters"]:
-            engaged_monsters += f"""
-                `[{monster_id}]`: 
-                **Type**: {desert["monsters"][monster_id]["name"].title()}
-                **HP**: {desert["monsters"][monster_id]["hp"]}
-                **Damage per hit**: {desert["monsters"][monster_id]["damage"]}
-
-            """
-
-        if engaged_monsters == '':
-            engaged_monsters = 'No monsters engaged.'
-
-        em.add_field(name="Boosts",value=f"""
-        **Mining speed**: {mines["multipliers"]["mining speed"]}
-        **Wagon size**: {mines["wagon"]["original limit"]}
-        **Item value**: {mines["multipliers"]["item value"]}
-
-
-        **Desert**:
-        Engaged monsters: 
-        {engaged_monsters}
-
-        **Active boosts**:
-        {active_potion_boosts}
-        """)
-
         em.add_field(name="Coliseum",value=f"""
         Victories: **{coliseum["victories"]}**
         Entered championships: **{coliseum["entered championships"]}**
@@ -315,7 +257,7 @@ class General(commands.Cog):
         **{coliseum["trophies"]["bronze trophies"]}** bronze trophies.
         """)
 
-        em.add_field(name="\u200b",value="For more information, visit `.help` and `.commands`",inline=False)
+        em.add_field(name="\u200b",value="For more information, visit `.help` or `.commands`",inline=False)
 
         await ctx.send(embed=em)
 
@@ -351,6 +293,8 @@ class General(commands.Cog):
             msg = 'No weapons in `backpack`.'
 
         await ctx.send(embed=em)
+
+        await ctx.send(bp["weapons"]["weapons"])
 
     @commands.command(aliases=['bot'])
     async def about(self,ctx):

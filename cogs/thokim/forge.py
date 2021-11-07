@@ -10,14 +10,7 @@ class Forge(commands.Cog):
     @commands.Cog.listener()
     async def on_ready(self):
         print('Forge extension ready. ')
-    
-    def cog_check(self,ctx):
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-        if gdata["status"] == 'frozen' or gdata["status"] == 'stunned' or gdata["status"] != 'stationary':
-            return False
-        return True
-    
+
     # do the make better weapons here
     # also better tools
 

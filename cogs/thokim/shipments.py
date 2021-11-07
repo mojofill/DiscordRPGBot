@@ -11,13 +11,6 @@ class Shipments(commands.Cog):
     async def on_ready(self):
         print('Shipments extension ready. ')
     
-    def cog_check(self,ctx):
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-        if gdata["status"] == 'frozen' or gdata["status"] == 'stunned' or gdata["status"] != 'stationary':
-            return False
-        return True
-    
     @commands.command()
     async def hourly(self,ctx):
         user = ctx.author
