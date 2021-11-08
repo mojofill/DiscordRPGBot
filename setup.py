@@ -17,9 +17,7 @@ from dev.tools import tools
 from dev.api import db
 from discord.ext import commands, tasks
 from discord import Embed
-from discord_slash import SlashCommand, SlashContext, ButtonStyle
 from dev.db import Database
-from discord_slash.utils.manage_components import create_button, create_actionrow
 
 load_dotenv()
 

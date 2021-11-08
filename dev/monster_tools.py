@@ -817,7 +817,7 @@ class _monster_tools():
                     "damage":damage,
                     "attack time":attack_time,
                     "elemental":elemental,
-                    "elemental type":
+                    "elemental type":2
                 },
                 "shield":shield_data,
                 "equipment type":equipment_type,
