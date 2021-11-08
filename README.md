@@ -21,3 +21,7 @@ The command `.monster` takes in data in `preview monster` and forms a `discord.E
 To fight the monster in `preview monster`, player must use `.engage` to engage with the monster and fight it.
 
 **Note**: if the player does not want to engage the monster, he must use `.skip` to skip the monster and continue in the monster loop.
+
+## Weapons
+### Elemental Weapons
+The name of elemental wepaons should be `"<elemental type> <weapon name>"`, E.G. `"lightning sword"`.

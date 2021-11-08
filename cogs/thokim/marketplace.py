@@ -130,6 +130,8 @@ class Marketplace(commands.Cog):
             else:
                 tools.travel(user,"marketplace")
         
+        # TODO finish all the ranges of id in this
+        # i should also reformat the code so different sections of the shop is given to the player
         item_type_dict = {
             (0,1):"gold bars",
             (1,12):"scrolls",

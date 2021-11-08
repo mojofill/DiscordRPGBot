@@ -743,7 +743,10 @@ class _monster_tools():
                 elemental_weapons = [
                     'lightning staff',
                     'blaze staff',
-                    'ice staff'
+                    'ice staff',
+                    'lightning sword',
+                    'flame sword',
+                    'ice sword'
                 ]
 
                 if weapon_name in elemental_weapons:
@@ -757,13 +760,21 @@ class _monster_tools():
                 elemental_arrows = [
                     'shock arrow',
                     'fire arrow',
-                    'ice arrow'
+                    'ice arrow',
+                    'wind arrow'
                 ]
 
                 if arrow_name in elemental_arrows:
                     return True
 
                 return False
+            
+            def getElementalEquipmentType(equipment_name: str):
+                elemental_weapon_types = {
+                    'lightning sword':'lightning',
+                    'ice sword':'ice',
+                    'fire sword':'fire'
+                }
 
             # code below gets the monster data
             monster_health = getMonsterHealth()
@@ -774,7 +785,13 @@ class _monster_tools():
                 durability, damage, base_equipment_name, name, monster_attack_type, arrow = getMonsterEquipmentData() # monster attack type is the type of equipment the monster is using - weapon or bow
             
             except ValueError: # not enough values to unpack - no arrows
-                durability, damage, base_equipment_name, name, monster_attack_type = getMonsterEquipmentData() # monster attack 
+                durability, damage, base_equipment_name, name, monster_attack_type = getMonsterEquipmentData()
+
+            durability: int
+            damage: int
+            base_equipment_name: str
+            name: str
+            monster_attack_type: str
 
             shield_durability, shield_knockback, shield_name = getShieldData()
 
@@ -801,11 +818,17 @@ class _monster_tools():
                 equipment_type = 'weapon'
 
                 elemental = getWeaponElemental(name)
+
+                if elemental:
+                    pass
             
             else:
                 equipment_type = 'bow'
 
                 elemental = getArrowElemental(arrow)
+
+                if elemental:
+                    pass
 
             new_monster_data = {
                 "name":monster_type,
