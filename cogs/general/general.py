@@ -332,7 +332,6 @@ class General(commands.Cog):
         em.add_field(name='Developer',value='bazingun#4610',inline=False)
         em.add_field(name='Active users: 1',value='\u200b',inline=False)
         em.add_field(name='Gameplay',value='For more information on game play, do `.guide`.',inline = False)
-
         
         em.set_footer(text=f'Requested by {ctx.author}',icon_url=ctx.author.avatar_url)
 
