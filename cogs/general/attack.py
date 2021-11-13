@@ -57,11 +57,13 @@ class Attack(commands.Cog):
 
 
     @commands.command(aliases=['select'])
-    async def equip(self,ctx:commands.Context,wpn_name=None):
-        if wpn_name == None:
+    async def equip(self, ctx:commands.Context, *wpn_name):
+        if not bool(wpn_name):
             await ctx.send('No argument for `weapon` - check your backpack with `.bp` to see all your weapons.')
             return
 
+        wpn_name = ' '.join(wpn_name)
+        
         user = ctx.author
         
         user_data = Database.Storages[user.id]
@@ -332,11 +334,13 @@ class Attack(commands.Cog):
 
                     base_monster, monster_rank = monster_tools.getMonsterFromPlayerLevel(gdata["level"])
 
-                    monster_data = await monster_tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank)
+                    monster_data = await monster_tools.spawnMonster(ctx, user, base_monster, monster_rank)
 
                     # now we can start accepting user commands
 
-                    monsters["preview"] = monster_data
+                    monsters["preview monster"] = monster_data
+
+                    loop = False # delete this later
                 
             else: # user did not find a monster. i can choose to put something here if i want
                 pass

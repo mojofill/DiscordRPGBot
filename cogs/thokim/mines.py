@@ -11,7 +11,7 @@ class Mines(commands.Cog):
     async def on_ready(self):
         print('Mines extension loaded.')
 
-    @commands.command(aliases=['s'])
+    @commands.command()
     @commands.cooldown(1,1,commands.BucketType.user)
     async def sell(self,ctx):
         bp = db.backpack

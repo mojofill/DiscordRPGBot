@@ -24,4 +24,6 @@ To fight the monster in `preview monster`, player must use `.engage` to engage w
 
 ## Weapons
 ### Elemental Weapons
-The name of elemental wepaons should be `"<elemental type> <weapon name>"`, E.G. `"lightning sword"`.
+There are (currently) 6 elemental *weapons*, and 4 elemental *arrows*. Elemental weapons have special properties, and also has to do with the elements. For example, when it's raining, shock arrows and lightning swords deal more damage and have special properties. It is crucial for the player to know if a monster has elemental weapons to wear the correct protective armor or drink the right potion to countereffect the elemental weapon.
+
+### How the code is written:

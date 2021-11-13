@@ -285,16 +285,40 @@ class General(commands.Cog):
 
         for weapon in bp["weapons"]["weapons"]:
             msg += f"""
-                {weapon.title()}
-                Health: {bp["weapons"]["weapons"][weapon]["durability"]}
+                **TYPE**: `{weapon.title()}`
+                **DURABILITY**: `{bp["weapons"]["weapons"][weapon]["durability"]}`
             """
         
         if msg == '':
             msg = 'No weapons in `backpack`.'
+        
+        msg += f'\n**SELECTED WEAPON**: `{bp["weapons"]["equipped weapon"]}`'
+
+        em.add_field(name='\u200b',value=msg)
 
         await ctx.send(embed=em)
+    
+    @commands.command()
+    async def weapons(self, ctx: commands.Context):
+        """Sends a message on the player's current weapons"""
 
-        await ctx.send(bp["weapons"]["weapons"])
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        weapons_str = [f'**{user}** Here are your weapons. Use `.equip <number>` to equip the given weapon at index `number`.\n']
+
+        index = 1
+
+        for wpn in bp["weapons"]["weapons"]:
+            weapons_str.append(f'**{index}**: `{wpn}`. **DURABILITY**: {bp["weapons"]["weapons"][wpn]["durability"]}, **DAMAGE**: `{bp["weapons"]["weapons"][wpn]["damage"]}`')
+        
+        weapons_str = '\n'.join(weapons_str)
+
+        # TODO maybe change to discord.Embed, not str
+
+        await ctx.send(weapons_str)
 
     @commands.command(aliases=['bot'])
     async def about(self,ctx):
