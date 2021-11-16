@@ -13,6 +13,7 @@ import random
 from discord import Message
 from dotenv import load_dotenv
 from copy import deepcopy
+from dev.monster_tools import monster_tools
 from dev.tools import tools
 from dev.api import db
 from discord.ext import commands, tasks
@@ -253,6 +254,13 @@ async def start(ctx:commands.Context):
         "energy gain time":1 # every second the user gains a portion of energy back - MIGHT BE TOO MUCH FOR THE BOT. will probably just set a larger energy, and remind the user to replenish his or her energy every once in a while
     }
 
+    # TODO add more here
+    location = { # everything about the current location the player is in - from the weather to if there's a cooking pot near him
+        "_id":user.id,
+        "weather":None,
+        "cooking pot":False # set to True if there
+    }
+
     coliseum = {
         "_id":user.id,
         "victories":0,
@@ -342,9 +350,27 @@ async def start(ctx:commands.Context):
         "armor":armor,
         "armor ratio":tools.getArmorDamageReductionRatio(armor), # type dict, armor damage reduction participation compared to total damage reduce
         "meals":{}, # these are for COOKED meals, not food that can be eaten raw
-        "items":{}, # items in here range from monster parts to apples
+        "items":{ # items in here range from monster parts to apples
+            "monster parts":{
+                # name of monster part: amount of monster parts
+                # "mogo claw":2
+            },
+            "food":{
+                # name of food: amount of food
+                # "apples":10
+            },
+            "meals":{
+                # name of meal: amount of that meal
+                # "hearty steak":4
+            }
+        },
         "unfinished potions":{},
-        "scrolls":{}
+        "scrolls":{},
+        "grabbable items":{
+            "weapons":[],
+            "loot":[],
+            "food":[]
+        } # contains all the items that is grabbable by the player - after a while if the player does not take the item, it will despawn
     }
 
     vault = {
@@ -432,10 +458,9 @@ async def start(ctx:commands.Context):
 
     monsters = {
         "_id":user.id,
-        "preview monster":{},
-        "engaged monster":None,
+        "preview monster":None,
         # "engaged monster":{}, # this is for the engaged monsters that are targetting and attacking the user
-        "hunt loop":False, # if this is False then hunting loop is stopped - else hunting loop should be continued
+        "monster loop":False, # if this is False then hunting loop is stopped - else hunting loop should be continued
         "total monsters defeated":0,
         "trophies":0,
         "previous moves":[], # clear this after every monster fight
@@ -701,6 +726,7 @@ async def start(ctx:commands.Context):
             db.duration.insert_one(duration)
             db.falcon_duration.insert_one(falcon_duration)
             db.quests.insert_one(quests)
+            db.location.insert_one(location)
             db.coliseum.insert_one(coliseum)
         
         def setUserAccountInDatabase():
@@ -724,6 +750,7 @@ async def start(ctx:commands.Context):
             immediate_duration_data = deepcopy(duration)
             immediate_falcon_duration_data = deepcopy(falcon_duration)
             immediate_quests_data = deepcopy(quests)
+            immediate_location_data = deepcopy(location)
 
             del immediate_game_data["date registered"]
 
@@ -731,6 +758,7 @@ async def start(ctx:commands.Context):
             data = {
                 "game":immediate_game_data,
                 "monsters":immediate_monsters_data,
+                "location":immediate_location_data,
                 "healthpoints":immediate_hp_data,
                 "backpack":immediate_backpack_data,
                 "armor":immediate_armor_data,
@@ -750,106 +778,8 @@ async def start(ctx:commands.Context):
         
         insertUserAccountInMongoDB()
         setUserAccountInDatabase()
-
-        user_data = Database.getStorageData(user)
-
-        async def giveStick():
-            """Give the player a stick."""
-
-            walk_to_outside_em = Embed(
-                description="Arrow walkeS outside of the temple, getting fresh air after a decade of sleeping in the Temple of Power..."
-            )
-
-            await ctx.send(embed=walk_to_outside_em)
-
-            await asyncio.sleep(3)
-
-            give_stick_em = Embed(
-                description="Arrow found a stick!"
-            )
-
-            give_stick_em.set_image(url='https://static.wikia.nocookie.net/zelda_gamepedia_en/images/4/4f/BotW_Tree_Branch_Model.png/revision/latest?cb=20201117203720')
-
-            take_stick_em = Embed(
-                description='Do you want to take the stick? React with <:regional_indicator_y:878106223839420436> or <:regional_indicator_n:878106367926349824>'
-            )
-            
-            await ctx.send(embed=give_stick_em)
-            stick_msg: Message = await ctx.send(embed=take_stick_em)
-
-            await stick_msg.add_reaction('🇾')
-            await stick_msg.add_reaction('🇳')
-            
-            reaction = None
-
-            try:
-                def check(reaction:discord.Reaction, _user:discord.User):
-                    return _user.id == user.id and str(reaction.emoji) in ['🇾','🇳'] and reaction.message.id == stick_msg.id
-            
-                reaction: discord.Reaction = await client.wait_for('reaction_add',check=check,timeout=30.0) # this specific wait for returns (reaction, user), but we only need the reaction object so we take the first element of the tuple, which is the reaction
-
-                reaction = reaction[0]
-            
-            except asyncio.TimeoutError:
-                await ctx.send('You have timed out, you are not taking the stick.')
-                return
-
-            # code here runs if the user has decided to take the stick, indicating that by reacting with y
-            if str(reaction.emoji) == '🇾': # this means the user wants to take the stick
-                await tools.addEquipment(ctx, user, "stick", "melee")
-
-                # damage = stick_stats["damage"]
-                # durability = stick_stats["durability"]
-                # attack_time = stick_stats["attack time"]
-                # energy_taken = stick_stats["energy taken"]
-
-                # bp["weapons"]["weapons"]["stick"] = {
-                #     "name":"stick",
-                #     "damage":stick_damage,
-                #     "durability":stick_durability,
-                #     "attack time":3,
-                #     "energy taken":5
-                # }
-                
-                # _em = discord.Embed(description='Arrow picked the stick up')
-
-                # _em.add_field(
-                #     name="Stick Attributes",
-                #     value=f"""
-                #         `Attack Power`: `{stick_damage}`
-                #         `Durability`: `{stick_durability}`
-                #         `Attack time`: `3 seconds`
-                #     """
-                # )
-
-                # _em.add_field(name='\u200b',value='Optional: set the name of your weapon with `.rename <weapon_name> <new_weapon_name>`')
-
-                # await ctx.send(embed=_em)
-
-                bp["weapons"]["equipped weapon"] = "stick"
-
-                # send a monster to attack user
-            
-            else: # user decided to not take the stick
-                em = discord.Embed(
-                    description='You have decided to not take the stick.',
-                    color=tools.lime
-                )
-
-            em = Embed(
-                description="Arrow was ambushed by a monster! A Mogosok just appeared in front of Arrow! Fight back!"
-            )
-
-            em.set_footer(text='')
-            
-            await ctx.send(embed=em)
-
-            # start the attack on the user
-            monster_data = await tools.spawnMonster(ctx, client, user, "mogosok", 1, block=True)
-
-            await tools.startMonsterAttackLoop(ctx, user, 1, monster_data, client)
         
-        # await giveStick()
+        await tools.addItem(ctx, "weapons", ["stick"])
     
     await tutorial()
 
@@ -890,6 +820,8 @@ def run():
 
 def main():
     # try:
+        os.system('cls')
+
         run()
     # except:
         print('Bot has crashed, retrying...')

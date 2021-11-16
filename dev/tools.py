@@ -15,6 +15,8 @@ async def attack(ctx: commands.Context): # i completely forgot why i made this b
     """Attacks player and does all necessary functions."""
 
 class Tools:
+    ITEM_DESPAWN_TIME = 300 # 300 seconds = 5 minutes - ALL items will despawn at most after 5 minutes. Some may despawn earlier
+
     def __init__(self):
         self.no_acc = 'You do not have an account. Make one with `.start`.'
         self.lime = discord.Color.from_rgb(144,238,144)
@@ -164,18 +166,83 @@ class Tools:
                     probabilities[i] = percentage * (100 - previous_total)
             
         return probabilities, piecewise_first_x
+
+    async def NoArgumentGiven(self, ctx: commands.Context, *missing_args):        
+        msg = '`,'.join(missing_args)
+
+        msg = msg[:-1]
+
+        msg = '`' + msg + '`'
+        
+        await ctx.reply(f'❌ Missing arguments: {msg}. If you ever need help on how to use a command, use `.help <command name>`.')
     
-    async def addEquipment(self, ctx: commands.Context, user: discord.User, equipment_name: str, attack_type: str, shield_compatible: bool = True) -> dict:
+    async def addItem(self, ctx: commands.Context, type: str, items: list):
+        """Adds an item to the player's grabbable items."""
+
+        user: discord.User = ctx.author
+
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        for i in items:
+            bp["grabbable items"][type].append(i)
+
+        msg = ['`']
+
+        for i in items:
+            msg.append(f'{i}`, `')
+        
+        msg = ''.join(msg)
+
+        msg = msg[:-1]
+
+        await ctx.send(f'Added {msg} to your grabbable items - use `.grab` to grab these items.')
+    
+    async def addLoot(self, ctx: commands.Context, items: list):
         """
+            Adds loot to the player's loot .Loot consists of monster parts and other things that do not belong in `weapons` and `food`.
+        """
+
+    async def addRawFood(self, ctx: commands.Context, items: list):
+        """
+            Adds food to the player's RAW food. If there's no more space for meals, then
+        """
+
+        user: discord.User = ctx.author
+
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        for i in items:
+            try:
+                bp["items"]["food"][i] += 1
+            
+            except KeyError: # this means that there isnt "i" type of food in the player's backpack yet, so add one
+                bp["items"]["food"][i] = 1 # first item that they had, so give a singular piece
+    
+    async def addMeal(self, ctx: commands.Context, meal):
+        """Adds a single meal to the player's backpack"""
+
+        # TODO finish this part of the code
+    
+    async def addEquipment(self, ctx: commands.Context, equipment_name: str, attack_type: str, shield_compatible: bool = True) -> dict:
+        """
+        NOTE: Method doesn't **actually** give the player equipment - it puts in the player's `grabbable items` `dict` in player' backpack.
+
         `shield_compatible` defaults `True`. Two handed weapons and all bows are not usable with shield.
 
-        Returns a `dict` containing all the weapon information:
+        NOTE: bows take no energy when used. However, durability is still taken away.
+
+        Adds a `dict` containing all the weapon information:
         ```
+        "name":str
         "damage":int
         "durability":int
         "attack time":int
         "attack type":str
-        "energy taken":int # NOTE: bows take NO energy
+        "energy taken":int
         "shield compatible":bool
         ```
 
@@ -183,6 +250,8 @@ class Tools:
         """
 
         # TODO: add the rest of the weapons
+
+        user: discord.User = ctx.author
 
         weapon_stats = {
             "stick":{
@@ -205,19 +274,23 @@ class Tools:
 
         stats = weapon_stats[equipment_name]
 
+        stats["damage"] = random.randint(stats["damage"][0], stats["damage"][1])
+        stats["durability"] = random.randint(stats["durability"][0], stats["durability"][1])
+
         user_data = Database.getStorageData(user)
 
         bp = user_data["backpack"]
 
         section = "weapons" if attack_type == 'melee' else "bows"
 
-        if not len(bp["weapons"][section]) == bp[section]["limit"]: # at limit - if add more will pass limit
+        if not len(bp["weapons"][section]) == bp[section]["limit"]: # not at limit - if add more will pass limit
             msg = ''
 
-            if not equipment_name in bp[section][section]:
-                bp[section][section][equipment_name] = stats
+            if not equipment_name in bp[section][section]: # weapon name not in the weapons - first type of weapon
+                stats["name"] = equipment_name
+                bp[section][section][f'{equipment_name}|1'] = stats
 
-                msg += f'{user.mention} Added **{equipment_name}** to your backpack.'
+                msg += f'{user.mention} Added **{equipment_name}** to your weapons.'
             
             else:
                 # weapon name already in weapons
@@ -905,7 +978,7 @@ class Tools:
                     wait = weather["risks"]["wait"]
                     @tasks.loop(seconds=wait)
                     async def tornado_loop():
-                        tornado_em = discord.Embed(color=self.lime)
+                        tornado_em = discord.Embed(color=discord.Color.dark_green())
 
                         # deal the recurring damage to the user
                         nonlocal weather
@@ -977,7 +1050,8 @@ class Tools:
                         wait = weather["risks"]["wait"]
                         @tasks.loop(seconds=wait)
                         async def thunderstorm_loop():
-                            em = discord.Embed(color=tools.lime)
+                            em = discord.Embed(                        tornado_em = discord.Embed(color=discord.Color.dark_green())
+)
                             gdata = db.game.find_one({"_id":user.id})
                             
                             # also do soemthing about other locations look to the left side of coding screen

@@ -1,4 +1,8 @@
-import discord,datetime,asyncio
+import discord
+import datetime
+import asyncio
+import sys
+import os
 from discord.ext import commands
 from dev.db import Database
 from dev.tools import tools
@@ -6,7 +10,7 @@ from dev.api import db
 from threading import Thread
 
 class General(commands.Cog):
-    def __init__(self,client):
+    def __init__(self, client: commands.Bot):
         self.client = client
 
     @commands.Cog.listener()
@@ -19,7 +23,7 @@ class General(commands.Cog):
         # right here check if the aspect is part of the acceptable aspects
         user = ctx.author
 
-        em = discord.Embed(title='',color=tools.lime,timestamp=datetime.datetime.utcnow())
+        em = discord.Embed(title='',color=discord.Color.dark_green(),timestamp=datetime.datetime.utcnow())
 
         em.set_footer(text=f'Requested by {user}',icon_url=user.avatar_url)
 
@@ -135,7 +139,7 @@ class General(commands.Cog):
     @commands.command(name='commands')
     async def command(self,ctx):
         user = ctx.author
-        em = discord.Embed(color=tools.lime,timestamp=datetime.datetime.utcnow(),title="Commands")
+        em = discord.Embed(color=discord.Color.dark_green(),timestamp=datetime.datetime.utcnow(),title="Commands")
         
         em.set_author(name=self.client.user,icon_url=self.client.user.avatar_url)
         em.set_footer(text=f'Requested by {user}',icon_url=user.avatar_url)
@@ -271,7 +275,7 @@ class General(commands.Cog):
         bp = user_data["backpack"]
 
         # remember the implement the method that rafael suggested, 
-        em = discord.Embed(color=tools.lime,title="Backpack")
+        em = discord.Embed(color=discord.Color.dark_green(),title="Backpack")
         em.set_author(name=user,icon_url=user.avatar_url)
 
         em.add_field(name="Currency",value=f"""
@@ -297,6 +301,45 @@ class General(commands.Cog):
         em.add_field(name='\u200b',value=msg)
 
         await ctx.send(embed=em)
+
+    @commands.command(aliases=['g'])
+    async def grab(self, ctx: commands.Context):
+        """Grabs ALL items in the player's backpack."""
+
+        user: discord.User = ctx.author
+
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        if len(bp["grabbable items"]["weapons"]) + len(bp["grabbable items"]["loot"]) + len(bp["grabbable items"]["food"]) == 0:
+            await ctx.reply('Nothing to grab.', mention_author=False)
+
+            return
+
+        for weapon in bp["grabbable items"]["weapons"]:
+            await tools.addEquipment(ctx, weapon, "melee")
+
+        await tools.addLoot(ctx, bp["grabbable items"]["loot"])
+        await tools.addRawFood(ctx, bp["grabbable items"]["food"])
+
+        bp["grabbable items"] = {"weapons":{}, "loot":{}, "food":{}}
+        
+    @commands.command(aliases=['c'])
+    async def cook(self, ctx: commands.Context):
+        """Cooks food for the player"""
+    
+    @commands.command()
+    async def add(self, ctx: commands.Context, *item):
+        """Adds items to the cooking pot if the player is near a cooking pot."""
+
+    @commands.command()
+    async def eat(self, ctx: commands.Context, *items):
+        pass
+
+    @commands.command()
+    async def eatmeal(self, ctx: commands.Context, meal):
+        await ctx.send()
     
     @commands.command()
     async def weapons(self, ctx: commands.Context):
@@ -322,7 +365,7 @@ class General(commands.Cog):
 
     @commands.command(aliases=['bot'])
     async def about(self,ctx):
-        em = discord.Embed(title='About DOLLARS',color=discord.Color.green())
+        em = discord.Embed(title='About DOLLARS',color=discord.Color.dark_green())
         em.set_author(name=self.client.user,icon_url = self.client.user.avatar_url)
         em.set_thumbnail(url=self.client.user.avatar_url)
         em.add_field(name='Version',value='1.0.0\n',inline=False)
@@ -337,6 +380,13 @@ class General(commands.Cog):
 
         await ctx.send(embed=em)
 
+    @commands.command(aliases=['quit'])
+    async def stop(self, ctx: commands.Context):
+        """TODO: DELETE THIS WHEN PUBLISHING THE BOT"""
+        await ctx.reply('Stopping bot...')
+
+        os.system('cls')
+        sys.exit()
 
     @commands.command()
     async def travelby(self,ctx,mode):  

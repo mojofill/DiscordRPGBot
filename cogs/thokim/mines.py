@@ -64,7 +64,7 @@ class Mines(commands.Cog):
 
         msg += f'\nThis is your total {items_total_price}'
 
-        em = discord.Embed(color=tools.lime,title="Test")
+        em = discord.Embed(color=discord.Color.dark_green(),title="Test")
 
         em.add_field(name=f"Sold {total_items} items from your backpack.",value=msg)  
 
@@ -94,7 +94,7 @@ class Mines(commands.Cog):
             
         mines = db.mines.find_one({"_id":user.id})
 
-        em = discord.Embed(color=tools.lime)
+        em = discord.Embed(color=discord.Color.dark_green())
         em.set_author(name=user,icon_url=user.avatar_url)
 
         # diving what the user has over what the limit is, multiply it by 10 to get the percentage, and call int on it to round down  

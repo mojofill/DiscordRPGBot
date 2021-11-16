@@ -52,7 +52,7 @@ class Shop(commands.Cog):
         em = discord.Embed(
             title='Black Market',
             description='Where the bullshit happen...',
-            color=discord.Color.green()
+            color=discord.Color.dark_green()
             )
 
         em.add_field(
@@ -235,7 +235,7 @@ class Shop(commands.Cog):
         potion_rarity = potion_stats["rarity"]
 
         em = discord.Embed(
-            color=tools.lime,
+            color=discord.Color.dark_green(),
             title=f"{user}'s Half-Brewed Potion",
             description="Thank you for buying from Thokim Pub! We're sorry we couldn't finish the potion you bought, but if you manage to find the rest of the ingredients needed, bring it back here and use `.finish <potion id>`."
         )

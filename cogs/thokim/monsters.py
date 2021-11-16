@@ -1,4 +1,6 @@
 import discord
+import json
+import asyncio
 import datetime
 from discord.ext import commands
 from dev.db import Database
@@ -17,7 +19,7 @@ class Monsters(commands.Cog):
 
         user_data = Database.getStorageData(user)
 
-        monsters = user_data["monsters"]
+        monsters: dict = user_data["monsters"]
 
         if monsters["preview monster"] == None:
             await ctx.send(f'{user.mention} no monster in sight ❌')
@@ -54,23 +56,43 @@ class Monsters(commands.Cog):
 
         if equipment_data["elemental"]:
             msg += f'\n**ELEMENTAL TYPE**: {equipment_data["elemental type"]}'
+        
+        if "engaged monster" in monsters.keys(): # add more to the data
+            msg += f"""
+                **DAMAGE PER HIT**: `{equipment_data["damage"]}`
+                **ATTACK TIME**: `{equipment_data["attack time"]}`
+            """
 
         em.add_field(name='\u200b', value=msg)
 
         await ctx.send(embed=em)
     
     @commands.command()
+    async def show(self, ctx: commands.Context):
+        user_data = Database.getStorageData(ctx.author)
+
+        await ctx.send(json.dumps(user_data["monsters"], indent=2))
+    
+    @commands.command()
     async def engage(self, ctx: commands.Context):
-        """Starts fight between user and monster."""
+        """Starts fight between user and monster. AFTER FIGHT IS DONE DELETE ENGAGED MONSTER AND SET PREVIEW MONSTER TO `None`"""
 
         user: discord.User = ctx.author
 
         user_data = Database.getStorageData(user)
 
-        monsters = user_data["monsters"]
+        monsters: dict = user_data["monsters"]
+
+        if "engaged monster" in list(monsters.keys()): # player is already fighting a monster
+            return
 
         monsters["engaged monster"] = monsters["preview monster"]
-        monsters["preview monster"] = None
+
+        await ctx.send('Starting fight in 3 seconds...')
+
+        await asyncio.sleep(3)
+
+        await ctx.send('Fight started!')
 
         await monster_tools.startMonsterAttackLoop(ctx, user)
 
@@ -82,36 +104,35 @@ class Monsters(commands.Cog):
         user_data = Database.getStorageData(user)
         monsters = user_data["monsters"]
 
-        try:
-            bp: dict = user_data["backpack"]
+        bp: dict = user_data["backpack"]
 
-            equiped_weapon: str = bp["weapons"]["equipped weapon"]
+        equiped_weapon: str = bp["weapons"]["equipped weapon"]
 
-            if equiped_weapon == None: # no weapon equipped
-                await ctx.reply('No weapon equipped. Use `.equiped <weapon_name>` to equip a wepaon. Use `.weapons` to look at your weapons.')
+        if equiped_weapon == None: # no weapon equipped
+            await ctx.reply('No weapon equipped. Use `.equiped <weapon_name>` to equip a wepaon. Use `.weapons` to look at your weapons.')
 
-                return
-
-            monster_data: dict = monsters["engaged monster"]
-
-            monster_data["health"] -= bp["weapons"]["weapons"][equiped_weapon]["damage"]
-
-            bp["weapons"]["weapons"][equiped_weapon]["durability"] -= 1
-
-            em = discord.Embed(
-                description=f'Used `{bp["weapons"]["weapons"][equiped_weapon]["name"]}` and dealt **{bp["weapons"]["weapons"][equiped_weapon]["damage"]} DAMAGE** to **{monster_data["name"]}**.',
-                color=discord.Color.dark_green(),
-                timestamp=datetime.datetime.utcnow()
-            )
-
-            if bp["weapons"]["weapons"][equiped_weapon]["durability"] == 0:
-                await ctx.send(f'{user.mention} your `{bp["weapons"]["weapons"][equiped_weapon]["name"]}` broke!')
-        
-        except KeyError: # no engaged monster
             return
 
-        except:
-            raise
+        try:
+            monster_data: dict = monsters["engaged monster"]
+        
+        except KeyError:
+            return # return because theres no engaged monster - cant attack `None` monster
+
+        monster_data["health"] -= bp["weapons"]["weapons"][equiped_weapon]["damage"]
+
+        bp["weapons"]["weapons"][equiped_weapon]["durability"] -= 1
+
+        em = discord.Embed(
+            description=f'Used `{bp["weapons"]["weapons"][equiped_weapon]["name"].title()}` and dealt **{bp["weapons"]["weapons"][equiped_weapon]["damage"]} DAMAGE** to **{monster_data["name"].title()}**.\nMonster **HEALTH**: `{monster_data["health"]}`\n{bp["weapons"]["weapons"][equiped_weapon]["name"].title()} **DURABILITY**: `{bp["weapons"]["weapons"][equiped_weapon]["durability"]}`',
+            color=discord.Color.dark_green(),
+            timestamp=datetime.datetime.utcnow()
+        )
+
+        await ctx.send(embed=em)
+
+        if bp["weapons"]["weapons"][equiped_weapon]["durability"] == 0:
+            await ctx.send(f'{user.mention} your `{bp["weapons"]["weapons"][equiped_weapon]["name"]}` broke!')
     
     @commands.command(aliases=['s'])
     async def shoot(self, ctx: commands.Context):

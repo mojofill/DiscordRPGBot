@@ -51,46 +51,38 @@ class Attack(commands.Cog):
 
         # refence dev.tools for more information on the code below
 
-        msg = monster_tools.all_quest_and_chest_actions(ctx,'coinflip',user)
+        msg = tools.all_quest_and_chest_actions(ctx, 'coinflip', user)
 
         await ctx.send(msg)
 
 
     @commands.command(aliases=['select'])
-    async def equip(self, ctx:commands.Context, *wpn_name):
-        if not bool(wpn_name):
-            await ctx.send('No argument for `weapon` - check your backpack with `.bp` to see all your weapons.')
+    async def equip(self, ctx:commands.Context, wpn_id: int = None):
+        if wpn_id == None:
+            await tools.NoArgumentGiven(ctx, ['wpn_id'])
             return
-
-        wpn_name = ' '.join(wpn_name)
         
-        user = ctx.author
+        user: discord.User = ctx.author
         
         user_data = Database.Storages[user.id]
 
         bp = user_data["backpack"]
 
-        if bp["equipped weapon"] == wpn_name:
-            ctx.message.add_reaction('<:x:883531508198035456>')
-            return
+        i = 1
+
+        wpn_id = int(wpn_id)
 
         for wpn in bp["weapons"]["weapons"]:
-            if bp["weapons"]["weapons"][wpn]["name"] == wpn_name:
-                # update in the user's document in backpack collection with equipped weapon as the weapon argument
+            if i == wpn_id:
+                bp["weapons"]["equipped weapon"] = wpn
 
-                user_data["backpack"]["equipped weapon"] = wpn_name
-        
-                em = discord.Embed(
-                    description=f'You have equipped `{wpn_name}`'
-                )
-
-                await ctx.send(embed=em)
+                await ctx.send(f'You have equipped **{bp["weapons"]["weapons"][wpn]["name"]}**')
 
                 return
         
         # if code reaches here then the bot has not found a weapon with the given name
         await ctx.send(embed=discord.Embed(
-            description=f'You do not have weapon of name `{wpn_name}`'
+            description=f'You do not have a weapon with id `{wpn_id}` - please check your weapons with `.weapons`.'
         ))
     
     @commands.command(aliases=['nwpn'])

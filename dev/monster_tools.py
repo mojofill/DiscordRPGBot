@@ -133,10 +133,15 @@ class _monster_tools():
 
                 number = random.randint(1, 100)
 
+                arrow = None
+
                 for arrow_chance in bow_data_dict[base_bow_name]["arrow probability"][monster_rank]:
                     if number in range(arrow_chance[0], arrow_chance[1]):
                         arrow: str = bow_data_dict[base_bow_name]["arrow probability"][monster_rank][arrow_chance]
                         break
+                
+                if arrow == None:
+                    raise
 
                 return bow_durability, bow_damage, new_bow_name, arrow
             
@@ -573,7 +578,7 @@ class _monster_tools():
         bp = user_data["backpack"]
         monsters = user_data["monsters"]
 
-        monsters["hunt loop"] = True
+        monsters["monster loop"] = True
 
         def getMonsterIntelligence(monster_name: str, monster_rank: int):
             """Monster intelligence is split in these 5 ranges
@@ -671,7 +676,7 @@ class _monster_tools():
                 if self.patience == 0:
                     await ctx.send(f'{user.mention} the monster grew bored of you because you did nothing back and left you. You have lost 3 XP because you dont want to fucking leave battles.')
                     
-                    monsters["hunt loop"] = False
+                    monsters["monster loop"] = False
 
                     gdata = user_data["game"]
 
@@ -707,7 +712,7 @@ class _monster_tools():
 
                     return verb_from_weapon[base_weapon_name]
 
-                while self.enemyPlayerObject.health > 0 and self.health > 0 and monsters["hunt loop"]:
+                while self.enemyPlayerObject.health > 0 and self.health > 0 and monsters["monster loop"]:
                     if time.time() - self.last_attack >= 6:
                         # its been more than 6 seconds since monster has last attacked - needs to attack back
                         if random.randint(1, 10) in range(1, 8):
@@ -737,8 +742,10 @@ class _monster_tools():
 
                         self.enemyPlayerObject.deductHealth(dmg)
                         
+                        msg += f'\nPlayer **HEALTH**: `{hp["health"]}`'
+
                         em = discord.Embed(
-                            color=tools.lime,
+                            color=discord.Color.dark_green(),
                             description=msg
                         )
 
@@ -823,7 +830,9 @@ class _monster_tools():
 
                 await ctx.send(f'battle time: {end_time - start_time}')
 
-                monsters["hunt loop"] = False
+                monsters["monster loop"] = False
+                monsters["preview monster"] = None
+                del monsters["engaged monster"]
             
         class Player:
             def __init__(self):
