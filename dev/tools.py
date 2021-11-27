@@ -175,8 +175,180 @@ class Tools:
         msg = '`' + msg + '`'
         
         await ctx.reply(f'❌ Missing arguments: {msg}. If you ever need help on how to use a command, use `.help <command name>`.')
+
+    async def spawnChest(self, ctx: commands.Context, type: Literal['monster camp', 'temple', 'treasure', 'wooden'], preset_chest_data: dict = None):
+        user: discord.user = ctx.author
+        user_data = Database.getStorageData(user)
+
+        chests: dict = user_data["chests"]
+
+        # chests = {
+        #     list of dicts - dicts contain chests data - when player uses .open, all chests in each category are opened
+        # 
+        #     "monster camp":list,
+        #     "temple":list,
+        #     "treasure":list,
+        #     "wooden":list
+        #
+        # }
+
+        if preset_chest_data != None:
+            chests["chests"][type].append(preset_chest_data)
+
+            return
+
+        def getChestData():
+            # range: 100
+            # NOTE: subject to change
+            
+            number = random.randint(0, 999)
+
+            chestFromTypeDict = {
+                "monster camp":{
+                    (0, 400):"equipment",
+                    (400, 700):"pet shards",
+                    (700, 900):"valuables",
+                    (900, 960):"potions",
+                    (960, 1000):"armor"
+                },
+                "temple":{
+                    (0, 500):"equipment",
+                    (500, 800):"pet shards",
+                    (800, 950):"valuables",
+                    (950, 970):"potions",
+                    (970, 1000):"armor"
+                },
+                "treasure":{
+                    (0, 300):"equipment",
+                    (300, 400):"pet shards",
+                    (400, 950):"valuables",
+                    (950, 990):"potions",
+                    (990, 1000):"armor"
+                },
+                "wooden":{
+                    (0, 10):"equipment",
+                    (10, 30):"pet shards",
+                    (30, 35):"potions",
+                    (35, 36):"armor",
+                    (36, 1000):"valuables"
+                }
+            }
+
+            def getAmountOfRewardFromChestType(reward_type: str) -> int:
+                """Returns an amount that represents the amount of stuff player recieves from a certain chest."""
+                reward_amounts = {
+                    "wooden":{
+                        "equipment":[0,1],
+                        "pet shards":[5,50],
+                        "valuables":[5,20]
+                    },
+                    "temple":{
+                        "equipment":[0,30],
+                        "pet shards":[20,50],
+                        "valuables":[20,30],
+                        "potions":[45,50],
+                        "armor":[44,45]
+                    },
+                    "treasure":{
+                        "equipment":[0,20],
+                        "pet shards":[0,30],
+                        "valuables":[30,45],
+                        "potions":[45, 50]
+                    },
+                    "monster camp":{
+                        "equipment":[0,30],
+                        "pet shards":[0,10],
+                        "valuables":[25,50],
+                        "potions":[40,50]
+                    }
+                }
+
+                amount: int = random.randint(reward_amounts[type][reward_type][0], reward_amounts[type][reward_type][1])
+
+                return amount
+            
+            def getSpecificRewardFromType(reward_type: str) -> str:
+                """Returns a `string` which represents the reward the player recieves"""
+
+                rewards = {
+                    "equipment":{
+                        "monster camp":{
+                            (0, 50):"leather set",
+                            (50, 99):"steel set",
+                            (99, 100):"soldier set"
+                        },
+                        "temple":{
+                            (0, 60):"leather set",
+                            (60, 99):"steel set",
+                            (99, 100):"soldier set"
+                        },
+                        "treasure":{
+                            (0, 99):"leather set",
+                            (99, 100):"steel set"
+                        },
+                        # impossible to get armor from wooden chest
+                        # "wooden":{
+                        #     (0, 100):"leather set"
+                        # }
+                    },
+                    # theres not really "types" of pet shards - pet shards are just pet shards
+                    # "pet shards":{}
+                    "valuables":{
+                        "monster camp":{
+                            (0, 50):"topaz", # 50%
+                            (50, 90):"opal", # 40%
+                            (90, 100):"diamond" # 10%
+                        },
+                        "temple":{
+                            (0, 5):"emerald", # 5%
+                            (5, 30):"opal", # 25%
+                            (30, 70):"sapphire", # 40%
+                            (70, 99):"ruby", # 29%
+                            (99, 100):"diamond" # 1%
+                        },
+                        "treasure":{
+                            (0, 400):"emerald", # 40%
+                            (400, 700):"ruby", # 30%
+                            (700, 900):"sapphire", # 20%
+                            (900, 970):"topaz", # 7%
+                            (970, 999):"opal", # 2.9%
+                            (999, 1000):"diamond" # 0.1%
+                        },
+                        "wooden":{
+                            # divide by 10000
+                            (0, 9000):"emerald", # 90%
+                            (9000, 9900):"ruby", # 9%
+                            (9900, 9990):"sapphire", # 0.9%
+                            (9990, 9995):"topaz", # 0.05%
+                            (9995, 9999):"opal", # 0.04%
+                            (9999, 10000):"diamond" # 0.01%
+                        }
+                    },
+                    "potions":{
+                        "monster camp":{
+                            (0, )
+                        }
+                    }
+                }
+
+            chest_data_probability = chestFromTypeDict[type]
+        
+            chest_data_probability = chestFromTypeDict[type]
+
+            chest_data = {}
+
+            # get all the stuff that the player got from the chest
+            for _range in chest_data_probability:
+                if number in range(_range[0], _range[1]):
+                    chest_data[chest_data_probability[_range]] = getAmountOfRewardFromChestType(chest_data_probability[_range])
+
+            return chest_data
+        
+        chest_data = getChestData()
+
+        chests["chests"][type].append(chest_data)
     
-    async def addItem(self, ctx: commands.Context, type: str, items: list):
+    async def addItems(self, ctx: commands.Context, type: str, items: list):
         """Adds an item to the player's grabbable items."""
 
         user: discord.User = ctx.author
@@ -186,7 +358,9 @@ class Tools:
         bp = user_data["backpack"]
 
         for i in items:
-            bp["grabbable items"][type].append(i)
+            try: bp["grabbable items"][type][i] += 1
+            except KeyError: bp["grabbable items"][type][i] = 1
+            await ctx.send(f'Added {i} to category `{type}`')
 
         msg = ['`']
 
@@ -197,11 +371,29 @@ class Tools:
 
         msg = msg[:-1]
 
+        # msg = msg[:-1]
+
         await ctx.send(f'Added {msg} to your grabbable items - use `.grab` to grab these items.')
     
+    async def addValuables(self, ctx: commands.Context, items: list):
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        bp: dict = user_data["backpack"]
+
+        msg = ''
+        
+        for item in items:
+            try: bp["grabbable items"]["valuables"][item] += 1
+            except KeyError: bp["valuables"][item] = 1
+
+            msg += f'\nAdded `{item}` to your valuables.'
+        
+        await ctx.send(msg)
+
     async def addLoot(self, ctx: commands.Context, items: list):
         """
-            Adds loot to the player's loot .Loot consists of monster parts and other things that do not belong in `weapons` and `food`.
+            Adds loot to the player's loot. Loot consists of monster parts..
         """
 
     async def addRawFood(self, ctx: commands.Context, items: list):
@@ -217,18 +409,20 @@ class Tools:
 
         for i in items:
             try:
-                bp["items"]["food"][i] += 1
+                bp["items"]["food"][i] += items[i]
             
             except KeyError: # this means that there isnt "i" type of food in the player's backpack yet, so add one
-                bp["items"]["food"][i] = 1 # first item that they had, so give a singular piece
+                bp["items"]["food"][i] = items[i] # first item that they had, so give a singular piece
     
-    async def addMeal(self, ctx: commands.Context, meal):
-        """Adds a single meal to the player's backpack"""
+    async def addMeal(self, ctx: commands.Context, meals):
+        """Adds a single meal to the player's backpack, because meals cannot stack on inventory"""
 
         # TODO finish this part of the code
     
-    async def addEquipment(self, ctx: commands.Context, equipment_name: str, attack_type: str, shield_compatible: bool = True) -> dict:
+    async def addEquipments(self, ctx: commands.Context, equipments: dict, shield_compatible: bool = True) -> dict:
         """
+        NOTE: `equipment_data` POINTS towards `bp["grabbable items"]["weapons"]` - not a dictionary
+
         NOTE: Method doesn't **actually** give the player equipment - it puts in the player's `grabbable items` `dict` in player' backpack.
 
         `shield_compatible` defaults `True`. Two handed weapons and all bows are not usable with shield.
@@ -258,7 +452,7 @@ class Tools:
                 "damage":[1, 2],
                 "durability":[5, 10],
                 "attack time":0.3,
-                "attack type":attack_type,
+                "attack type":"melee",
                 "energy taken":1,
                 "shield compatible":True
             },
@@ -266,75 +460,222 @@ class Tools:
                 "damage":[5, 10],
                 "durability":[20, 30],
                 "attack time":0.3,
-                "attack type":attack_type,
+                "attack type":"melee",
                 "energy taken":2,
                 "shield compatible":True
             }
         }
 
-        stats = weapon_stats[equipment_name]
-
-        stats["damage"] = random.randint(stats["damage"][0], stats["damage"][1])
-        stats["durability"] = random.randint(stats["durability"][0], stats["durability"][1])
-
-        user_data = Database.getStorageData(user)
-
-        bp = user_data["backpack"]
-
-        section = "weapons" if attack_type == 'melee' else "bows"
-
-        if not len(bp["weapons"][section]) == bp[section]["limit"]: # not at limit - if add more will pass limit
-            msg = ''
-
-            if not equipment_name in bp[section][section]: # weapon name not in the weapons - first type of weapon
-                stats["name"] = equipment_name
-                bp[section][section][f'{equipment_name}|1'] = stats
-
-                msg += f'{user.mention} Added **{equipment_name}** to your weapons.'
-            
-            else:
-                # weapon name already in weapons
-                def get_default_equipment_name() -> str:
-                    nonlocal equipment_name
-
-                    default_equipment_name = equipment_name
-
-                    found_copy_of_name = False
-
-                    for equipment_name in bp[section][section]:
-                        # checking the base name of weapons because default weapon name is set by finding all the same weapons and adding the amount plus one to it.
-                        if bp[section][section][equipment_name]["name"] == equipment_name:
-                            found_copy_of_name = True
-
-                            # split the weapon kind by splitter "|". The second part of the list depicts which weapon number that is. First weapon number is 1 by default
-                            weapon_number = int(equipment_name.split('|')[1])
-                            new_weapon_number = weapon_number + 1
-
-                            # when replaced, the new weapon name will look like (example weapon as sword)
-                            # sword|3
-                            break
-                    
-                    # this is the first weapon of its kind in the user's backpack, so no copies were found
-                    if found_copy_of_name == False:
-                        # just slap a "1" on the end because its the first one
-                        new_weapon_number = 1
-                    
-                    default_equipment_name += new_weapon_number
-                    
-                    return default_equipment_name
+        def getAttackType(base_equipment_name: str) -> str:
+            attack_types = {
+                # MELEE
+                    "stick":"melee",
+                    "mogo club":"melee",
+                    "mogo club":"melee",
+                    "mogo spear":"melee",
+                    "mogo bat":"melee",
+                    "wooden bat":"melee",
+                    "wooden spiked bat":"melee",
+                    "wooden spear":"melee",
+                    "knight's broadsword":"melee",
+                    "knight's claymore":"melee",
+                    "steel spear":"melee",
+                    "steel sword":"melee",
+                    "steel mace":"melee",
+                    "stick":"melee",
                 
-                default_equipment_name = get_default_equipment_name()
-            
-                weapon_info_split = default_equipment_name.split('|')
+                # RANGED
+                    "wooden bow":"ranged",
+                    "lightning staff":"ranged",
+                    "blaze staff":"ranged",
+                    "ice staff":"ranged",
+                    "flame sword":"ranged",
+                    "ice sword":"ranged"
+            }
 
-                weapon_number = weapon_info_split[1]
+            attack_type = attack_types[base_equipment_name]
 
-                msg += f"{user.mention} set your weapon to {weapon_info_split[0]}`{weapon_number}`.\nIf you wish to change your weapon name, use `.rename`"
+            return attack_type
+
+        # NOTE: the equipment name is the name of the BASE weapon name, such as sword. The "official" name of a weapon is the BASE weapon name and the number of the weapon name joined by '|'
             
-            await ctx.send(msg)
-        
-        else: # cannot add more weapon - will pass limit if so
-            await ctx.send(f'{user.mention} cannot add `{equipment_name}` to your backpack, not enough space.')
+        for equipment_name in equipments:
+            stats = weapon_stats[equipment_name]
+
+            stats["damage"] = random.randint(stats["damage"][0], stats["damage"][1])
+            stats["durability"] = random.randint(stats["durability"][0], stats["durability"][1])
+
+            user_data = Database.getStorageData(user)
+
+            bp = user_data["backpack"]
+
+            attack_type = getAttackType(equipment_name)
+
+            section = "weapons" if attack_type == 'melee' else "bows"
+
+            if not len(bp["weapons"][section]) == bp[section]["limit"]: # not at limit - if add more will pass limit
+                final_equipment_name = None
+
+                if not equipment_name in bp[section][section]: # weapon name not in the weapons - first type of weapon
+                    stats["name"] = equipment_name
+                    bp[section][section][f'{equipment_name}|1'] = stats
+
+                    msg = f'{user.mention} Added **{equipment_name}** to your weapons.'
+
+                    final_equipment_name = equipment_name + '|1'
+                
+                else:
+                    # weapon name already in weapons
+                    def get_default_equipment_name() -> str:
+                        nonlocal equipment_name
+
+                        default_equipment_name = equipment_name
+
+                        found_copy_of_name = False
+
+                        for equipment_name in bp[section][section]:
+                            # checking the base name of weapons because default weapon name is set by finding all the same weapons and adding the amount plus one to it.
+                            if bp[section][section][equipment_name]["name"] == equipment_name:
+                                found_copy_of_name = True
+
+                                # split the weapon kind by splitter "|". The second part of the list depicts which weapon number that is. First weapon number is 1 by default
+                                weapon_number = int(equipment_name.split('|')[1])
+                                new_weapon_number = weapon_number + 1
+
+                                # when replaced, the new weapon name will look like (example weapon as sword)
+                                # sword|3
+                                break
+                        
+                        # this is the first weapon of its kind in the user's backpack, so no copies were found
+                        if found_copy_of_name == False:
+                            # just slap a "1" on the end because its the first one
+                            new_weapon_number = 1
+                        
+                        default_equipment_name += new_weapon_number
+                        
+                        return default_equipment_name
+                    
+                    default_equipment_name = get_default_equipment_name()
+                
+                    weapon_info_split = default_equipment_name.split('|')
+
+                    weapon_number = weapon_info_split[1]
+
+                    msg = f"{user.mention} set your weapon to {weapon_info_split[0]}`{weapon_number}`.\nIf you wish to change your weapon name, use `.rename`"
+
+                    final_equipment_name = default_equipment_name
+                
+                if attack_type == 'melee':
+                    category = 'weapons'
+                
+                else:
+                    category = 'bows'
+
+                def getEquipmentData() -> dict:
+                    # TODO: finish all this
+                    two_handed_weapon_attack_time = 1.5
+                    spear_attack_time = 0.15
+                    one_handed_weapon_attack_time = 0.25
+
+                    two_handed_weapon_energy_taken = 25
+                    one_handed_weapon_energy_taken = 10
+                    spear_energy_taken = 15
+
+                    equipment_datas = {
+                        # MELEE
+                            "mogo club":{
+                                "damage":[2, 5],
+                                "durability":[10, 20],
+                                "attack time":one_handed_weapon_attack_time,
+                                "energy taken":one_handed_weapon_energy_taken
+                            },
+                            "mogo spear":{
+                                "damage":[2, 5],
+                                "durability":[10, 20],
+                                "attack time":two_handed_weapon_attack_time,
+                                "energy taken":spear_energy_taken
+                            },
+                            "mogo bat":{
+                                "damage":[10, 20],
+                                "durability":[20, 30],
+                                "attack time":two_handed_weapon_attack_time,
+                                "energy taken":two_handed_weapon_energy_taken
+                            },
+                            "wooden bat":{
+                                "damage":[1, 5],
+                                "durability":[8, 16],
+                                "attack time":two_handed_weapon_attack_time,
+                                "energy taken":two_handed_weapon_energy_taken
+                            },
+                            "wooden spiked bat":{
+                                "damage":[10, 15],
+                                "durability":[10, 20],
+                                "attack time":two_handed_weapon_attack_time,
+                                "energy taken":two_handed_weapon_energy_taken
+                            },
+                            "wooden spear":{
+                                "damage":[1, 5],
+                                "durability":[5, 10],
+                                "attack time":spear_attack_time,
+                                "energy taken":spear_energy_taken
+                            },
+                            "knight's broadsword":{
+                                "damage":[20, 40],
+                                "durability":[30, 50],
+                                "attack time":one_handed_weapon_attack_time,
+                                "energy taken":one_handed_weapon_energy_taken
+                            },
+                            "knight's claymore":{
+                                "damage":[30, 60],
+                                "durability":[30, 50],
+                                "attack time":two_handed_weapon_attack_time,
+                                "energy taken":two_handed_weapon_energy_taken
+                            },
+                            "steel spear":{
+                                "damage":[25, 40],
+                                "durability":[25, 40],
+                                "attack time":spear_attack_time,
+                                "energy taken":spear_energy_taken
+                            },
+                            "steel sword":{
+                                "damage":[25, 40],
+                                "durability":[30, 45],
+                                "attack time":one_handed_weapon_attack_time,
+                                "energy taken":one_handed_weapon_energy_taken
+                            },
+                            "steel mace":{
+                                "damage":[40, 70],
+                                "durability":[45, 60],
+                                "attack time":two_handed_weapon_attack_time,
+                                "energy taken":two_handed_weapon_energy_taken
+                            },
+                            "stick":{
+                                "damage":[2, 3],
+                                "durability":[5, 8],
+                                "attack time":one_handed_weapon_attack_time,
+                                "energy taken":one_handed_weapon_energy_taken
+                            },
+                        
+                        # RANGED
+
+                    }
+
+                    equipment_data = equipment_datas[equipment_name]
+
+                    damage: int = random.randint(equipment_data["damage"][0], equipment_data["damage"][1])
+                    durability: int = random.randint(equipment_data["durability"][0], equipment_data["durability"][1])
+
+                    equipment_data["damage"] = damage
+                    equipment_data["durability"] = durability
+                    
+                    return equipment_data
+                
+                bp[category][category][final_equipment_name] = getEquipmentData()
+                
+                await ctx.send(msg)
+            
+            else: # cannot add more weapon - will pass limit if so
+                await ctx.send(f'{user.mention} cannot add `{equipment_name}` to your backpack, not enough space.')
 
     def getDurabilityOfWeapon(self, *, wpn_str: str) -> int:
         """This method gets the durability of weapon given by the `wpn_str` parameter."""
@@ -348,19 +689,19 @@ class Tools:
         return random.randint(ranges[0], ranges[1])
         
     def getIfWeaponIsRepairable(self, wpn_str: str) -> bool:
-        """This method returns a `bool`, `True` if weapon can be repaired and `False1 if not."""
+        """This method returns a `bool`, `True` if weapon can be repaired and `False` if not."""
     
     def getArmorDamageReductionRatio(self,data:dict) -> dict:
         """Method returns a `dict`, representing a ratio consisting of the damage reduction participation of every piece of armor in the data, compared to the `total_damage_reduce`."""
         total_damage_reduce = 0
         
         for armor in data["base"]:
-            total_damage_reduce += data["base"][armor]["damage reduce"]
+            total_damage_reduce += data["base"][armor]["protection"]
         
         ratio = {}
 
         for armor in data["base"]:
-            ratio[armor] =  data["base"][armor]["damage reduce"] / total_damage_reduce # part over whole - simple fraction/ratio
+            ratio[armor] =  data["base"][armor]["protection"] / total_damage_reduce # part over whole - simple fraction/ratio
         
         return ratio
     
@@ -383,7 +724,7 @@ class Tools:
                         '__monster__ __verb__ __user__, crushing __user__\'s dreams of becoming the greatest.',
                         '__user__ played themself and got __verb__ by __monster__'
                     ],
-                    "bow":[
+                    "ranged":[
                         '__user__ got __verb__ whilst attacking __monster__'
                     ]
                 },
@@ -392,7 +733,7 @@ class Tools:
                         '__monster__ __verb__ __user__ and killed them.',
                         '__monster__ completely wrecked __user__, __verb__ them, dealing catastrophic damage.'
                     ],
-                    "bow":[
+                    "ranged":[
                         '__monster__ shot your fucking ass __user__'
                     ]
                 }
@@ -462,7 +803,7 @@ class Tools:
                     "mythical":[95,99],
                     "legendary":[99,100]
                 },
-                "damage reduce":{
+                "protection":{
                     "common":[0,45],
                     "uncommon":[45,70], # finish this, go down and add potion rarity in boosts.local potions, and finish code in falcon.py
                     "rare":[70,85],
@@ -544,7 +885,7 @@ class Tools:
                     "mythical":[6,7],
                     "legendary":[7,8]
                 },
-                "damage reduce":{
+                "protection":{
                     "common":0.9, # this is the total reduction of the armor set.
                     "uncommon":0.9, # if i want this to be a real damage
                     "rare":0.85,
@@ -587,7 +928,7 @@ class Tools:
                     "mythical":[20,35],
                     "legendary":[30,40]
                 },
-                "damage reduce":{
+                "protection":{
                     "common":0.9, # this is the total reduction of the armor set.
                     "uncommon":0.9, # if i want this to be a real damage
                     "rare":0.85,
@@ -614,7 +955,7 @@ class Tools:
             else:
                 value_range = value_from_type_and_rarity[potion_type][potion_rarity]
 
-            if potion_type == "damage reduce":
+            if potion_type == "protection":
                 value = value_range
 
             else:
@@ -712,7 +1053,7 @@ class Tools:
                     
                     db.mines.update_one({"_id":user.id},{"$set":{"wagon size":mines["wagon.original size"]}})
                 
-                elif potion_type == 'damage reduce':
+                elif potion_type == 'protection':
                     bp = db.backpack.find_one({"_id":user.id})
 
                     armor_ratio = bp["armor ratio"]
@@ -722,14 +1063,14 @@ class Tools:
                     base_total_damage_reduction = 0
 
                     for armor in bp["armor"]["base"]:
-                        base_total_damage_reduction += bp["armor"]["base"][armor]["damage reduce"]
+                        base_total_damage_reduction += bp["armor"]["base"][armor]["protection"]
 
                     for armor in bp["armor"]["final"]:
                         armor_damage_reduction_participation = armor_ratio[armor] # this is a float for the percentage of damage reduction the armor has compared to the total damage reduction
 
                         base_armor_damage_reduce_value = armor_damage_reduction_participation * base_total_damage_reduction
 
-                        bp["armor"]["final"][armor]["damage reduce"] = base_armor_damage_reduce_value
+                        bp["armor"]["final"][armor]["protection"] = base_armor_damage_reduce_value
                     
                     db.backpack.update_one({"_id":user.id},{"$set":{"armor.final":bp["armor"]["final"]}})
                 
@@ -799,7 +1140,7 @@ class Tools:
 
                     del queue[0] # removes the next loop from the queue as it is already activated
 
-                    loop = self.get_potion_duration_subtract_loop(user=user,potion_id=next_potion_ID,falcon=falcon) # recursion to start new loop. dude. this starts an entirely new loop, completely unrelated with the old damage reduce potion.
+                    loop = self.get_potion_duration_subtract_loop(user=user,potion_id=next_potion_ID,falcon=falcon) # recursion to start new loop. dude. this starts an entirely new loop, completely unrelated with the old protection potion.
 
                     loop.start()
                 
@@ -842,9 +1183,9 @@ class Tools:
                         
                         db.falcon.update_one({"_id":user.id},{"$set":{f"abilities":falcon["abilities"]}})
 
-                    elif potion_type == 'damage reduce':
+                    elif potion_type == 'protection':
                         for armor_piece in falcon["armor"]:
-                            falcon["armor"][armor_piece]["damage reduce"]
+                            falcon["armor"][armor_piece]["protection"]
 
                             """I need to set up some sort of plan for affecting stats and reverting to what it was before"""
             
@@ -1293,7 +1634,7 @@ class Tools:
         total_damage_reduce_percentage = 0
         
         for armor_piece in falcon["armor"]:
-            total_damage_reduce_percentage += falcon["armor"][armor_piece]["damage reduce"]
+            total_damage_reduce_percentage += falcon["armor"][armor_piece]["protection"]
         
         final_damage = incoming_damage * (1-total_damage_reduce_percentage) # this is the equivalent of dmg = dmg * (100-x)%
 
@@ -1310,7 +1651,7 @@ class Tools:
         for armor in hp["equipped armor"]:
             # go through all the armor in the user's hp (what the user is wearing right now is always in the healthpoints collection) and calculate entire armor reduce
 
-            final_reduce += hp["equipped armor"][armor]["damage reduce"]
+            final_reduce += hp["equipped armor"][armor]["protection"]
 
         # subtract reduce by one, because percentage and multiply that to the damage, which reduces it
         final_damage = (1-final_reduce) * damage

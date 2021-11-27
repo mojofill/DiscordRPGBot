@@ -62,7 +62,7 @@ class Shop(commands.Cog):
             `[2]` Wagon size: 100
             `[3]` item value: 100
             `[4]` Damage increase: 200
-            `[5]` (Incoming) damage reduce: 200
+            `[5]` protection: 200
             `[6]` Luck: 80
         """
         )
@@ -102,7 +102,7 @@ class Shop(commands.Cog):
             2:"wagon size",
             3:"item value",
             4:"damage increase",
-            5:"damage reduce",
+            5:"protection",
             6:"luck",
             7:"energy efficiency",
             8:"heat resist",
@@ -142,7 +142,7 @@ class Shop(commands.Cog):
                 "bugosok bone":10,
                 "minotaur horn":8
             },
-            "damage reduce":{
+            "protection":{
                 "tough ogre skin":20,
                 "cyclops eye":15,
                 "baursok tail":10

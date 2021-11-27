@@ -468,15 +468,15 @@ class Falcon_games(commands.Cog):
                                                 },
                                                 "armor":{
                                                     "helm":{
-                                                        "damage reduce":3, # divide the random integer by 100, since we cannot generate a random float
+                                                        "protection":3, # divide the random integer by 100, since we cannot generate a random float
                                                         "health":100
                                                     },
                                                     "chestplate":{
-                                                        "damage reduce":7,
+                                                        "protection":7,
                                                         "health":100
                                                     },
                                                     "greaves":{
-                                                        "damage reduce":5,
+                                                        "protection":5,
                                                         "health":100
                                                     }
                                                 }
@@ -515,15 +515,15 @@ class Falcon_games(commands.Cog):
                                                 },
                                                 "armor":{
                                                     "helm":{
-                                                        "damage reduce":5,
+                                                        "protection":5,
                                                         "health":100
                                                     },
                                                     "chestplate":{
-                                                        "damage reduce":15,
+                                                        "protection":15,
                                                         "health":100
                                                     },
                                                     "greaves":{
-                                                        "damage reduce":1,
+                                                        "protection":1,
                                                         "health":100
                                                     }
                                                 }
@@ -562,15 +562,15 @@ class Falcon_games(commands.Cog):
                                                 },
                                                 "armor":{
                                                     "helm":{
-                                                        "damage reduce":10,
+                                                        "protection":10,
                                                         "health":105
                                                     },
                                                     "chestplate":{
-                                                        "damage reduce":15,
+                                                        "protection":15,
                                                         "health":105
                                                     },
                                                     "greaves":{
-                                                        "damage reduce":15,
+                                                        "protection":15,
                                                         "health":105
                                                     }
                                                 }

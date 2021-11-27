@@ -189,12 +189,12 @@ class Loops(commands.Cog):
             def run():
                 user_id = player["_id"]
 
-                all_quest_ids = list(player["quests"].keys())
+                all_quest_ids = list(player["daily"].keys())
 
                 for quest_id in all_quest_ids:
-                    del player["quests"][quest_id]
+                    del player["daily"][quest_id]
                 
-                quests_.update_one({"_id":user_id},{"$set":{"quests":player["quests"]}})
+                quests_.update_one({"_id":user_id},{"$set":{"quests":player["daily"]}})
 
                 quests_to_give = random.randint(3,5)
 

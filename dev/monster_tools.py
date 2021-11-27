@@ -236,14 +236,14 @@ class _monster_tools():
                         "range":10,
                         "choices":{
                             "melee":[1,7],
-                            "bow":[7,10]
+                            "ranged":[7,10]
                         }
                     }
                 }
 
                 nonlocal monster_type
 
-                monster_attack_type_data = monster_attack_type_probabilities[monster_type]
+                monster_attack_type_data = monster_attack_type_probabilities[monster_type] # this gets the attack type for the mosnter - melee or ranged
 
                 number = random.randint(1, monster_attack_type_data["range"] - 1)
 
@@ -257,6 +257,7 @@ class _monster_tools():
                 if monster_attack_type == None:
                     print('monster attack type is None')
                 
+                # inside each key, there are keys inside those keys that are each monster, and inside those monsters there there are the possbilities, of what type of weapon to take
                 base_equipment_name_dict = {
                     "melee":{
                         "mogosok":{
@@ -267,7 +268,7 @@ class _monster_tools():
                             }
                         }
                     },
-                    "bow":{
+                    "ranged":{
                         "mogosok":{
                             "range":1,
                             "choices":{
@@ -290,11 +291,13 @@ class _monster_tools():
             
                 if monster_attack_type == 'melee':
                     equipment_durability, equipment_damage, new_equipment_name = getWpnData(equipment_name)
+
+                    return equipment_durability, equipment_damage, equipment_name, new_equipment_name, monster_attack_type
                 
-                else:
+                else: # monster_attack_type == 'ranged
                     equipment_durability, equipment_damage, new_equipment_name, arrow = getBowData(equipment_name)
                 
-                return equipment_durability, equipment_damage, equipment_name, new_equipment_name, monster_attack_type
+                    return equipment_durability, equipment_damage, equipment_name, new_equipment_name, monster_attack_type, arrow
             
             def getFightBackCountdown(base_monster: str) -> int:
                 # TODO add more to fightback countdown dict
@@ -347,26 +350,27 @@ class _monster_tools():
             
             def getElementalEquipmentType(name: str):
                 elemental_weapon_types = {
-                    'lightning sword':'lightning',
-                    'ice sword':'ice',
-                    'fire sword':'fire',
-                    'great lightning sword':'lightning',
-                    'great ice sword':'ice',
-                    'great fire sword':'fire'
-                }
+                    # melee
+                        'lightning sword':'lightning',
+                        'ice sword':'ice',
+                        'fire sword':'fire',
+                        'great lightning sword':'lightning',
+                        'great ice sword':'ice',
+                        'great fire sword':'fire',
+                    
+                    # arrows
+                        "shock arrow":"lightning",
+                        "ice arrow":"ice",
+                        "fire arrow":"fire",
+                        "wind arrow":"wind",
 
-                elemental_arrow_types = {
-                    "shock arrow":"lightning",
-                    "ice arrow":"ice",
-                    "fire arrow":"fire",
-                    "wind arrow":"wind"
+                    # staffs
+                        "lightning staff":"lighting",
+                        "fire staff":"fire",
+                        "ice staff":"ice"
                 }
-
-                try:
-                    elemental_type = elemental_weapon_types[name]
-                
-                except KeyError:
-                    elemental_type = elemental_arrow_types[name]
+            
+                elemental_type = elemental_weapon_types[name]
                 
                 return elemental_type
 
@@ -388,12 +392,8 @@ class _monster_tools():
             monster_attack_type: str
 
             shield_durability, shield_knockback, shield_name = getShieldData()
-
-            if monster_attack_type == 'bow':
-                attack_time = tools.getEquipmentAttackTime(base_equipment_name, name)
-            
-            else:
-                attack_time = tools.getEquipmentAttackTime(base_equipment_name, name)
+    
+            attack_time = tools.getEquipmentAttackTime(base_equipment_name, name)
             
             fightback_countdown = getFightBackCountdown(monster_type)
             shot_probability = getShotProbability(monster_type)
@@ -409,13 +409,9 @@ class _monster_tools():
                 }
 
             if monster_attack_type == 'melee':
-                equipment_type = 'weapon'
-
                 elemental = getWeaponElemental(name)
             
             else:
-                equipment_type = 'bow'
-
                 elemental = getArrowElemental(arrow)
 
             new_monster_data = {
@@ -431,7 +427,6 @@ class _monster_tools():
                     "elemental":elemental
                 },
                 "shield":shield_data,
-                "equipment type":equipment_type,
                 "fight back countdown":fightback_countdown,
                 "shot probability":shot_probability
             }
@@ -575,7 +570,6 @@ class _monster_tools():
         user_data = Database.getStorageData(user)
 
         hp = user_data["healthpoints"]
-        bp = user_data["backpack"]
         monsters = user_data["monsters"]
 
         monsters["monster loop"] = True
@@ -839,7 +833,7 @@ class _monster_tools():
                 monsters["previous moves"].append(time.time())
 
             def deductHealth(self, base_damage: int) -> None:
-                """Takes IN the user's armor reduction, and takes away the final damage reduce."""
+                """Takes IN the user's armor reduction, and takes away the final protection."""
                 final_damage = tools.process_all_damage_reduce(user, base_damage)
 
                 hp["health"] -= final_damage # in dict deduct health
@@ -883,5 +877,11 @@ class _monster_tools():
             monster = Monster(player, name=name, rank=1, bow=monster_bow, attack_wait=attack_wait)
 
         await monster.startAttackLoop()
+    
+    async def startMonsterCamp(self, ctx: commands.Context, camp_data: dict):
+        """Starts putting the player within a monster camp."""
+
+        # step 1: get all the monster, and put them in a list, with 0th index being first monster and -1th index being last monster
+        # step 2: engage
 
 monster_tools = _monster_tools()

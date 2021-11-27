@@ -316,12 +316,11 @@ class General(commands.Cog):
             await ctx.reply('Nothing to grab.', mention_author=False)
 
             return
-
-        for weapon in bp["grabbable items"]["weapons"]:
-            await tools.addEquipment(ctx, weapon, "melee")
-
+        
+        await tools.addEquipments(ctx, bp["grabbable items"]["weapons"])
         await tools.addLoot(ctx, bp["grabbable items"]["loot"])
         await tools.addRawFood(ctx, bp["grabbable items"]["food"])
+        await tools.addValuables(ctx, bp["grabbable items"]["valuables"])
 
         bp["grabbable items"] = {"weapons":{}, "loot":{}, "food":{}}
         
@@ -356,6 +355,8 @@ class General(commands.Cog):
 
         for wpn in bp["weapons"]["weapons"]:
             weapons_str.append(f'**{index}**: `{wpn}`. **DURABILITY**: {bp["weapons"]["weapons"][wpn]["durability"]}, **DAMAGE**: `{bp["weapons"]["weapons"][wpn]["damage"]}`')
+
+            index += 1
         
         weapons_str = '\n'.join(weapons_str)
 

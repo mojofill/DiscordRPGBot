@@ -1,9 +1,16 @@
-def func():
-    a = 'ab'
-    return a
+class Parent:
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
 
-try:
-    a, b = func()
+class Child(Parent):
+    def __init__(self, a, b, c):
+        super().__init__(a, b)
+    
+        self.c = c
 
-except:
-    pass
+parent = Parent(1, 2)
+print(parent.a, parent.b)
+
+child = Child(1, 2, 3)
+print(child.c)

@@ -1,7 +1,7 @@
 """
 On line 126 of cogs.thokim.boosts, we set a key,value pair with ID as a pair, and that id is an integer, which is not BSONSerializable. Change later if need be.
 
-As a reminder, before you publish this bot go to global search and search TODO to find all the things still need to be done
+As a reminder, before you publish this bot go to global search and search TODO to find all the things still need to be done.
 """
 
 import discord
@@ -9,8 +9,6 @@ import datetime
 import os
 import json
 import asyncio
-import random
-from discord import Message
 from dotenv import load_dotenv
 from copy import deepcopy
 from dev.monster_tools import monster_tools
@@ -23,6 +21,10 @@ from dev.db import Database
 from discord_slash.utils.manage_components import create_button, create_actionrow
 
 load_dotenv()
+
+class GameBot(commands.Bot):
+    def __init__(self, command_prefix, help_command='<default-help-command>', description=None, **options):
+        super().__init__(self, command_prefix, help_command=help_command, description=None, **options)
 
 client = commands.Bot(command_prefix='.')
 
@@ -47,7 +49,6 @@ def in_case_of_crash(ctx:commands.Context):
     
     else: # this just means its all good, nothing crashed
         return True
-    
 
 @client.check # add check name attr - inheritance new class etc
 async def hasAcc(ctx:commands.Context):
@@ -224,7 +225,6 @@ async def start(ctx:commands.Context):
     gdata = {
         "_id":user.id,
         "realm":"thokim",
-        "location":"home",
         "status":"stationary",
         "default transport":"walking",
         "level":1,
@@ -257,6 +257,7 @@ async def start(ctx:commands.Context):
     # TODO add more here
     location = { # everything about the current location the player is in - from the weather to if there's a cooking pot near him
         "_id":user.id,
+        "location":"temple of power",
         "weather":None,
         "cooking pot":False # set to True if there
     }
@@ -280,19 +281,19 @@ async def start(ctx:commands.Context):
                 "type":"helmet",
                 "health":1000,
                 "bonuses":None,
-                "damage reduce":0.2
+                "protection":0.2
             },
             "chestplate":{
                 "type":"chestplate",
                 "health":1000,
                 "bonuses":None,
-                "damage reduce":0.5
+                "protection":0.5
             },
             "greaves":{
                 "type":"greaves",
                 "health":1000,
                 "bonuses":None,
-                "damage reduce":0.3
+                "protection":0.3
             }
         },
         "final":{ # takes in all potion effects too
@@ -300,19 +301,19 @@ async def start(ctx:commands.Context):
                 "type":"helmet",
                 "health":1000,
                 "bonuses":None,
-                "damage reduce":0.2
+                "protection":0.2
             },
             "chestplate":{
                 "type":"chestplate",
                 "health":1000,
                 "bonuses":None,
-                "damage reduce":0.5
+                "protection":0.5
             },
             "greaves":{
                 "type":"greaves",
                 "health":1000,
                 "bonuses":None,
-                "damage reduce":0.3
+                "protection":0.3
             }
         }
     }
@@ -348,7 +349,7 @@ async def start(ctx:commands.Context):
             "damage increase multiply":1,
         },
         "armor":armor,
-        "armor ratio":tools.getArmorDamageReductionRatio(armor), # type dict, armor damage reduction participation compared to total damage reduce
+        "armor ratio":tools.getArmorDamageReductionRatio(armor), # type dict, armor damage reduction participation compared to total protection
         "meals":{}, # these are for COOKED meals, not food that can be eaten raw
         "items":{ # items in here range from monster parts to apples
             "monster parts":{
@@ -367,9 +368,11 @@ async def start(ctx:commands.Context):
         "unfinished potions":{},
         "scrolls":{},
         "grabbable items":{
-            "weapons":[],
-            "loot":[],
-            "food":[]
+            "weapons":{},
+            "bows":{},
+            "loot":{},
+            "food":{},
+            "valuables":{}
         } # contains all the items that is grabbable by the player - after a while if the player does not take the item, it will despawn
     }
 
@@ -386,17 +389,17 @@ async def start(ctx:commands.Context):
         "armor":{
             "helmet":{
                 "name":"helmet",
-                "damage reduce":0.03,
+                "protection":0.03,
                 "health":50
             },
             "chestplate":{
                 "name":"chestplate",
-                "damage reduce":0.07,
+                "protection":0.07,
                 "health":65
             },
             "wing shield":{
                 "name":"wing shield",
-                "damage reduce":0.05,
+                "protection":0.05,
                 "health":50
             }
         },
@@ -533,12 +536,18 @@ async def start(ctx:commands.Context):
         }
     }
 
+    # for more information on pets, check pets.py and README.md
     pet = {
         "_id":user.id,
         "shards":0,
-        "normal pets":{},
-        "mythical pets":{},
-        "legendary pets":{},
+        "pets":{
+            # "wolf":{
+            #     "heath":100,
+            #     "damage":5,
+            #     "attack name":"bit",
+            #     "attack time":0.5
+            # }
+        }
     }
 
     # important note, lcuk arrays here will just be for fractions. For example [1,4] would be 1 out of 4 chance of something happening.
@@ -564,7 +573,7 @@ async def start(ctx:commands.Context):
                 "value multipliers":{},
                 "wagon size":{},
                 "scam luck":0,
-                "damage reduce":{},
+                "protection":{},
                 "damage increase":{}
             },
             "passive":{
@@ -573,13 +582,13 @@ async def start(ctx:commands.Context):
                 "wagon size":{},
                 "healing":1,
                 "scam luck":0,
-                "damage reduce":{},
+                "protection":{},
                 "damage increase":{}
             }
             },
             "local potions":{
             "luck":{},
-            "damage reduce":{},
+            "protection":{},
             "damage increase":{},
             "value multipliers":{},
             "mining speed":{},
@@ -590,14 +599,15 @@ async def start(ctx:commands.Context):
             "all unused potions":{}
     }
 
-    chests = {
+    chests_data = {
         "_id":user.id,
         "chests":{
-            "legendary":0,
-            "rare":0,
-            "epic":0,
-            "uncommon":0,
-            "common":0
+            # list of dicts - dicts contain chests data - when player uses .open, all chests in each category are opened
+            "monster camp":[],
+            "temple":[],
+            "treasure":[],
+            "wooden":[]
+
         },
         "unclaimed shipments":{
             "hourly":False,
@@ -631,20 +641,22 @@ async def start(ctx:commands.Context):
         "queue":{}
     }
 
+    # TODO: spend some time just writing down all the quests a player can have    
     quests = {
         "_id":user.id,
-        "quests":{
-            '1':{
-                "name":'flip a coin 3 times',
-                "limit":20,
-                "commands with quest":[
-                'coinflip'
-                ],
-                "amount required":3,
-                "progress":0
-                }
-            }
-        }
+        "main":{
+            "uncompleted":{},
+            "completed":{}
+        },
+        "side":{
+            "uncompleted":{},
+            "completed":{}
+        },
+        "daily":{},
+        "weekly":{}
+
+        # TODO: create documentation for all quests in the game
+    }
 
     async def tutorial():
         """This tutorial should first, give the user a weapon and tell user about the game."""
@@ -720,7 +732,7 @@ async def start(ctx:commands.Context):
             db.vault.insert_one(vault)
             db.monsters.insert_one(monsters)
             db.boosts.insert_one(boosts)
-            db.chests.insert_one(chests)
+            db.chests.insert_one(chests_data)
             db.farm.insert_one(farm)
             db.special_commands.insert_one(special_commands)
             db.duration.insert_one(duration)
@@ -744,7 +756,7 @@ async def start(ctx:commands.Context):
             immediate_monsters_data = deepcopy(monsters)
             immediate_pet_data = deepcopy(pet)
             immediate_boosts_data = deepcopy(boosts)
-            immediate_chests_data = deepcopy(chests)
+            immediate_chests_data = deepcopy(chests_data)
             # immediate_farm_data = deepcopy(farm)
             immediate_special_commands_data = deepcopy(special_commands)
             immediate_duration_data = deepcopy(duration)
@@ -779,7 +791,24 @@ async def start(ctx:commands.Context):
         insertUserAccountInMongoDB()
         setUserAccountInDatabase()
         
-        await tools.addItem(ctx, "weapons", ["stick"])
+        user_data = Database.getStorageData(user)
+
+        await ctx.send("Basic tutorial\nTODO: Finish this. Even if it's in simple text representation.")
+
+        await ctx.send("You found a chest! Use `.open` to open up the chest and look at the content. TODO: Set up a method in tools.py that tells the player that they recieved a chest")
+
+        chest_type = "wooden"
+
+        await tools.spawnChest(ctx, chest_type, {"opal":2, "stick":1})
+
+        # somehow wait for the user to take the chest first before moving onto the next step
+        
+        chests = user_data["chests"]
+
+        async def nextStep():
+            """Tell the player to go fight some monsters now"""
+
+            await ctx.send('Now that you have some opals and weapons, you have been assigned a quest: fight a single monster!\n\nDo some shit in code to write that the player has a quest to finish.')
     
     await tutorial()
 
@@ -798,7 +827,7 @@ async def clear(ctx: commands.Context):
     await ctx.send('All user accounts deleted.')
 
 @client.command()
-async def clear1(ctx):
+async def clear1(ctx: commands.Context):
     names = db.list_collection_names()
     user: discord.User = ctx.author
     for collection in names:

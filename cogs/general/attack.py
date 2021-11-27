@@ -3,7 +3,6 @@ import discord,random
 from discord.ext import commands
 from dev.tools import tools
 from dev.db  import Database
-from cogs.thokim.falcon import hunt
 from dev.map import Map
 from dev.monster_tools import monster_tools
 
@@ -79,6 +78,8 @@ class Attack(commands.Cog):
                 await ctx.send(f'You have equipped **{bp["weapons"]["weapons"][wpn]["name"]}**')
 
                 return
+            
+            i += 1
         
         # if code reaches here then the bot has not found a weapon with the given name
         await ctx.send(embed=discord.Embed(
@@ -312,10 +313,8 @@ class Attack(commands.Cog):
             radius = 30
 
             current_cord = spawnCoord
-            
-            loop = True
 
-            while loop: # this is for the monster loop
+            while monsters["loop"]: # if this gets set to false via end command, loop should stop
                 aloneOrMonsterCamp = random.randint(1, 50)
 
                 if aloneOrMonsterCamp == 50: # RNG decides that the user can fight a whole monster camp!
@@ -329,13 +328,8 @@ class Attack(commands.Cog):
                     monster_data = await monster_tools.spawnMonster(ctx, user, base_monster, monster_rank)
 
                     # now we can start accepting user commands
-
+                    # once preview monster is set to something else rather than None, the player is able to use all commands such as attack or shoot
                     monsters["preview monster"] = monster_data
-
-                    loop = False # delete this later
-                
-            else: # user did not find a monster. i can choose to put something here if i want
-                pass
         
             while True: # while loop for ONE of the next coords
                 x = random.randint(current_cord[0] - radius, current_cord[0] + radius)
@@ -347,14 +341,26 @@ class Attack(commands.Cog):
 
                 if abs(x - current_cord[0]) + abs(y - current_cord[1]) <= radius:
                     current_cord = (x, y)
-                    loop = False
                     break
         
         elif target == 'prey':
             """Start prey loop"""
-    
-        else: # hunt with falcon
-            await hunt(ctx)
+        
+        # TODO: change this so all the hunting is not done in one command
+        
+    @commands.command()
+    async def end(self, ctx: commands.Context):
+        """Ends the hunting loop that the player is in."""
+
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+        monsters: dict = user_data["monsters"]
+
+        if monsters["loop"]:
+            monsters["loop"] = False
+        
+        else:
+            await ctx.reply('You are currently not fighting any monster.', meniton_author=False)
 
 def setup(client: commands.Bot):
     client.add_cog(Attack(client))
