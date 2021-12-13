@@ -4,7 +4,7 @@ import asyncio
 import datetime
 from discord.ext import commands
 from dev.db import Database
-from dev.monster_tools import monster_tools
+from dev.MonsterTools import MonsterTools
 from dev.tools import tools
 
 class Monsters(commands.Cog):
@@ -86,15 +86,15 @@ class Monsters(commands.Cog):
         if "engaged monster" in list(monsters.keys()): # player is already fighting a monster
             return
 
-        monsters["engaged monster"] = monsters["preview monster"]
-
         await ctx.send('Starting fight in 3 seconds...')
 
         await asyncio.sleep(3)
 
         await ctx.send('Fight started!')
 
-        await monster_tools.startMonsterAttackLoop(ctx, user)
+        monsters["engaged monster"] = monsters["preview monster"]
+
+        await MonsterTools.startMonsterAttackLoop(ctx, user)
 
     @commands.command(aliases=['att','a','atk'])
     async def attack(self, ctx: commands.Context):
@@ -109,7 +109,7 @@ class Monsters(commands.Cog):
         equiped_weapon: str = bp["weapons"]["equipped weapon"]
 
         if equiped_weapon == None: # no weapon equipped
-            await ctx.reply('No weapon equipped. Use `.equiped <weapon_name>` to equip a wepaon. Use `.weapons` to look at your weapons.')
+            await ctx.reply('No weapon equipped. Use `.equip <weapon_index>` to equip a wepaon. Use `.weapons` to look at your weapons.')
 
             return
 
@@ -119,20 +119,35 @@ class Monsters(commands.Cog):
         except KeyError:
             return # return because theres no engaged monster - cant attack `None` monster
 
+        if bp["weapon cooldown"]:
+            return # do not attack when on cooldown
+
         monster_data["health"] -= bp["weapons"]["weapons"][equiped_weapon]["damage"]
 
         bp["weapons"]["weapons"][equiped_weapon]["durability"] -= 1
 
-        em = discord.Embed(
-            description=f'Used `{bp["weapons"]["weapons"][equiped_weapon]["name"].title()}` and dealt **{bp["weapons"]["weapons"][equiped_weapon]["damage"]} DAMAGE** to **{monster_data["name"].title()}**.\nMonster **HEALTH**: `{monster_data["health"]}`\n{bp["weapons"]["weapons"][equiped_weapon]["name"].title()} **DURABILITY**: `{bp["weapons"]["weapons"][equiped_weapon]["durability"]}`',
-            color=discord.Color.dark_green(),
-            timestamp=datetime.datetime.utcnow()
-        )
+        equipment_name = bp["weapons"]["weapons"][equiped_weapon]["name"].title()
+        damage = bp["weapons"]["weapons"][equiped_weapon]["damage"]
+        monster_name = monster_data["name"].title()
 
-        await ctx.send(embed=em)
+        attack_time = bp["weapons"]["weapons"][equiped_weapon]["attack time"]
+
+        monster_health = monster_data["health"]
+
+        equipment_durability = bp["weapons"]["weapons"][equiped_weapon]["durability"]
+
+        msg = f'{user.mention} Used `{equipment_name}` and dealt **{damage} DAMAGE** to **{monster_name}**.\nMonster **HEALTH**: `{monster_health}`\n{equipment_name} **DURABILITY**: `{equipment_durability}`'
+
+        await ctx.send(msg)
 
         if bp["weapons"]["weapons"][equiped_weapon]["durability"] == 0:
             await ctx.send(f'{user.mention} your `{bp["weapons"]["weapons"][equiped_weapon]["name"]}` broke!')
+
+        bp["weapon cooldown"] = True
+
+        await asyncio.sleep(attack_time)
+
+        bp["weapon cooldown"] = False
     
     @commands.command(aliases=['s'])
     async def shoot(self, ctx: commands.Context):

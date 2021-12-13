@@ -4,12 +4,13 @@ import datetime
 import asyncio
 import random
 import time
+from dev.items import ItemsTool
 from dev.tools import tools
 from dev.db import Database
 from discord.ext import commands
 
 class _monster_tools():    
-    async def spawnMonster(self, ctx: commands.Context, user: discord.User, monster_type: str, monster_rank: int) -> dict:
+    async def spawnMonster(self, ctx: commands.Context, monster_type: str, monster_rank: int) -> dict:
         """Method spawns a monster. User can either choose to engage the monster, or on rare occasions the monster will come towards to user. Returns `dict` if the monster spawn worked. Raises `MonsterSpawnFailed` if user declines if `block` is `False` (it's `False` by default) - immediately returns `dict` if `block` is `True`"""
         
         """
@@ -17,9 +18,16 @@ class _monster_tools():
             monster_rank = the ranking of the monster in the monster hierarchy
         """
 
+        user: discord.User = ctx.author
+
         def getMonster():
             def getWpnData(base_wpn_name: str) -> tuple:
-                """Takes in the base weapon name, uses the monster rank to decide on a final weapon which is has that weapon as a base but modifications designed for a monster that specific rank."""
+                """
+                Takes in the base weapon name, uses the monster rank to decide on a final weapon which is has that weapon as a base but modifications designed for a monster that specific rank.
+
+                Returns a tuple in the order:
+                `weapon durability, weapon damage, new weapon name`
+                """
 
                 # TODO finish all the weapons in here
 
@@ -82,7 +90,12 @@ class _monster_tools():
                 return wpn_durability, wpn_damage, new_wpn_name
             
             def getBowData(base_bow_name) -> tuple:
-                """Read the `__doc__` of `getWpnData`, but replace weapon with bow and you get the gist."""
+                """
+                Takes in the base bow name, uses the monster rank to decide on a final bow which is has that bow as a base but modifications designed for a monster that specific rank.
+
+                Returns a tuple in the order:
+                `bow durability, bow damage, new bow name, arrow type`
+                """
 
                 # TODO finish all the bows in here
                 # TODO finish the arrow probabilites IMPORTANT i need this very much
@@ -133,17 +146,17 @@ class _monster_tools():
 
                 number = random.randint(1, 100)
 
-                arrow = None
+                arrow_type = None
 
                 for arrow_chance in bow_data_dict[base_bow_name]["arrow probability"][monster_rank]:
                     if number in range(arrow_chance[0], arrow_chance[1]):
-                        arrow: str = bow_data_dict[base_bow_name]["arrow probability"][monster_rank][arrow_chance]
+                        arrow_type: str = bow_data_dict[base_bow_name]["arrow probability"][monster_rank][arrow_chance]
                         break
                 
-                if arrow == None:
+                if arrow_type == None:
                     raise
 
-                return bow_durability, bow_damage, new_bow_name, arrow
+                return bow_durability, bow_damage, new_bow_name, arrow_type
             
             def getShieldData():
                 monster_shields = {
@@ -234,8 +247,8 @@ class _monster_tools():
                 monster_attack_type_probabilities = {
                     "mogosok":{
                         "range":10,
-                        "choices":{
-                            "melee":[1,7],
+                        "choices":{ # REMEMBER TO CHANGE THIS BACK TO NORMAL
+                            "melee":[0, 7],
                             "ranged":[7,10]
                         }
                     }
@@ -288,16 +301,33 @@ class _monster_tools():
                     if number in range(monster_base_equipment_data["choices"][equipment_name_][0], monster_base_equipment_data["choices"][equipment_name_][1]):                        
                         equipment_name = equipment_name_
                         break
-            
-                if monster_attack_type == 'melee':
+
+                return_data = None
+
+                if monster_attack_type == 'ranged':
+                    equipment_durability, equipment_damage, new_equipment_name, arrow_type = getBowData(equipment_name)
+                
+                    return_data = {
+                        "durability":equipment_durability,
+                        "damage":equipment_damage,
+                        "base name":equipment_name,
+                        "name":new_equipment_name,
+                        "attack type":monster_attack_type,
+                        "arrow type":arrow_type
+                    }
+                
+                elif monster_attack_type == 'melee':
                     equipment_durability, equipment_damage, new_equipment_name = getWpnData(equipment_name)
 
-                    return equipment_durability, equipment_damage, equipment_name, new_equipment_name, monster_attack_type
+                    return_data = {
+                        "durability":equipment_durability,
+                        "damage":equipment_damage,
+                        "base name":equipment_name,
+                        "name":new_equipment_name,
+                        "attack type":monster_attack_type
+                    }
                 
-                else: # monster_attack_type == 'ranged
-                    equipment_durability, equipment_damage, new_equipment_name, arrow = getBowData(equipment_name)
-                
-                    return equipment_durability, equipment_damage, equipment_name, new_equipment_name, monster_attack_type, arrow
+                return return_data
             
             def getFightBackCountdown(base_monster: str) -> int:
                 # TODO add more to fightback countdown dict
@@ -377,19 +407,18 @@ class _monster_tools():
             # code below gets the monster data
             monster_health = getMonsterHealth()
 
-            arrow = None # to avoid error later on such as no variable named 'arrow'
+            arrow_type = None # to avoid error later on such as no variable named 'arrow_type'
             
-            try:
-                durability, damage, base_equipment_name, name, monster_attack_type, arrow = getMonsterEquipmentData() # monster attack type is the type of equipment the monster is using - weapon or bow
-            
-            except ValueError: # not enough values to unpack - no arrows
-                durability, damage, base_equipment_name, name, monster_attack_type = getMonsterEquipmentData()
+            equipment_data = getMonsterEquipmentData()
 
-            durability: int
-            damage: int
-            base_equipment_name: str
-            name: str
-            monster_attack_type: str
+            durability: int = equipment_data["durability"]
+            damage: int = equipment_data["damage"]
+            base_equipment_name: str = equipment_data["base name"]
+            name: str = equipment_data["name"]
+            monster_attack_type: str = equipment_data["attack type"]
+
+            try: arrow_type: str = equipment_data["arrow type"]
+            except KeyError: pass
 
             shield_durability, shield_knockback, shield_name = getShieldData()
     
@@ -412,7 +441,7 @@ class _monster_tools():
                 elemental = getWeaponElemental(name)
             
             else:
-                elemental = getArrowElemental(arrow)
+                elemental = getArrowElemental(arrow_type)
 
             new_monster_data = {
                 "name":monster_type,
@@ -441,9 +470,13 @@ class _monster_tools():
 
         base_monster: str = monster_data["name"]
 
-        await ctx.send(f"{user.mention} you have found a **{base_monster}**! Enter `.monster` to find out more about this monster.")
+        await ctx.send(f"{user.mention} you have found a **{base_monster}**! Enter `.monster` to find out more about this monster. Enter `.engage` to fight this monster!")
 
-        return monster_data
+        user_data = Database.getStorageData(user)
+        monsters = user_data["monsters"]
+
+        # once preview monster is set to something else rather than None, the player is able to use all commands such as attack or shoot
+        monsters["preview monster"] = monster_data
 
     def getMonsterFromPlayerLevel(self, level: int) -> str:
         """Takes in the player level `level` and returns a random monster (`str` format) based on the user's level. Returns a tuple containing `base_monster` and `monster_rank`"""
@@ -598,6 +631,88 @@ class _monster_tools():
         
         monster_data = monsters["engaged monster"]
 
+        async def drop(ctx: commands.Context) -> list:
+            """
+            This drops everything a monster drops, including its equipment.
+            """
+
+            def getDropAmount(item_name: str, rank: int) -> int:
+                """
+                `item_name`: the name of the item
+                `rank`: the rank of the monster
+                """
+
+                items = {
+                    "mogo fang":{
+                        1:(1, 1),
+                        2:(1, 2),
+                        3:(2, 3),
+                        4:(3, 4)
+                    },
+                    "mogo horn":{
+                        1:(1, 1),
+                        2:(1, 1),
+                        3:(1, 1),
+                        4:(1, 1)
+                    },
+                    "mogo guts":{
+                        1:(1, 1),
+                        2:(1, 2),
+                        3:(2, 3),
+                        4:(3, 4)
+                    }
+                }
+
+                _range = items[item_name][rank]
+
+                amount = random.randint(_range[0], _range[1])
+
+                return amount
+
+            monster_data = monsters["preview monster"]
+
+            name: str = monster_data["name"]
+            rank: int = monster_data["rank"]
+
+            equipped_weapon: dict = monster_data["equipment"]
+            
+            monster_drops = {
+                "mogosok":{
+                    (0, 5):"mogo fang",
+                    (0, 3):"mogo horn",
+                    (5, 7):"mogo guts"
+                }
+            }
+
+            drops = {
+                # "name":amount
+            }
+
+            possible_drops = monster_drops[name]
+
+            ranges = list(possible_drops.keys())
+
+            x = random.randint(ranges[0][0], ranges[-1][1])
+
+            for _range in ranges:
+                if x in range(_range[0], _range[1]):
+                    drop_name: str = possible_drops[_range]
+
+                    amount: int = getDropAmount(drop_name, rank)
+                    
+                    drops[drop_name] = amount
+            
+            await tools.addEquipments(ctx, preset_equipments=[equipped_weapon], grabbable=True)
+            
+            for item in drops:
+                item_type = ItemsTool.getRewardType(item)
+
+                items_to_add = {
+                    item: drops[item]
+                }
+
+                await tools.addGrabbableItems(ctx, item_type, items_to_add)
+
         class Monster:
             def __init__(self, enemyPlayerObject, name: str, rank: int, attack_wait: int, wpn: dict = None, bow: str = None):
                 self.name = name
@@ -674,8 +789,8 @@ class _monster_tools():
 
                     gdata = user_data["game"]
 
-                    if not gdata["experience"] < 3:
-                        gdata["experience"] -= 3
+                    if not gdata["xp"] < 3:
+                        gdata["xp"] -= 3
 
                 else:
                     if time.time() - self.enemyPlayerObject.time_of_previous_move >= 5:
@@ -723,7 +838,7 @@ class _monster_tools():
 
                             verb = getVerbOfWeaponName(weapon_name)
 
-                            msg = f'A {self.name} used its **{weapon_name.title()}** and {verb} you, dealing {weapon_damage} **HP**.'
+                            msg = f'{user.mention} A {self.name} used its **{weapon_name.title()}** and {verb} you, dealing {weapon_damage} **HP**.'
 
                             dmg = weapon_damage
 
@@ -738,18 +853,11 @@ class _monster_tools():
                         
                         msg += f'\nPlayer **HEALTH**: `{hp["health"]}`'
 
-                        em = discord.Embed(
-                            color=discord.Color.dark_green(),
-                            description=msg
-                        )
-
-                        em.set_author(name=f'{user.name}#{user.discriminator}', icon_url=user.avatar_url)
-
                         open_attack_chance = False
 
                         self.last_attack = time.time()
 
-                        await ctx.send(embed=em)
+                        await ctx.send(msg)
                     
                     else:
                         """Code here will decide whether to wait for an opening or randomly (read = stupidly) try to attack."""
@@ -824,6 +932,9 @@ class _monster_tools():
 
                 await ctx.send(f'battle time: {end_time - start_time}')
 
+                # drop monster loot
+                await drop(ctx)
+
                 monsters["monster loop"] = False
                 monsters["preview monster"] = None
                 del monsters["engaged monster"]
@@ -883,5 +994,19 @@ class _monster_tools():
 
         # step 1: get all the monster, and put them in a list, with 0th index being first monster and -1th index being last monster
         # step 2: engage
+    
+    async def addMonsterSouls(self, ctx: commands.Context, amount: int = 1):
+        """
+        Adds a single monster soul to player monsters section.
+        Turn set amount to something else rather than `1` when player is fighting in a monster camp.
+        """
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
 
-monster_tools = _monster_tools()
+        monsters = user_data["monsters"]
+
+        monsters["monster souls"] += 1
+
+        await ctx.send(f'{user.mention} you have earned `{amount}` Monster Soul (get cool emoji of spirit looking thing).')
+
+MonsterTools = _monster_tools()

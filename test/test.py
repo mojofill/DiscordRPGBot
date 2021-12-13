@@ -1,16 +1,7 @@
-class Parent:
-    def __init__(self, a, b):
-        self.a = a
-        self.b = b
+from dev.api import db
 
-class Child(Parent):
-    def __init__(self, a, b, c):
-        super().__init__(a, b)
-    
-        self.c = c
-
-parent = Parent(1, 2)
-print(parent.a, parent.b)
-
-child = Child(1, 2, 3)
-print(child.c)
+db.preset_data.insert_one(
+    {
+        "_id":"quests",
+    }
+)

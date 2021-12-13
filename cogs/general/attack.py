@@ -4,7 +4,7 @@ from discord.ext import commands
 from dev.tools import tools
 from dev.db  import Database
 from dev.map import Map
-from dev.monster_tools import monster_tools
+from dev.MonsterTools import MonsterTools
 
 class Attack(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -14,6 +14,7 @@ class Attack(commands.Cog):
     async def on_ready(self):
         print('Attack extension loaded. ')
   
+    @commands.check(tools.checkPLayerNotConfined)
     @commands.command()
     async def punch(self,ctx:commands.Context,enemy):
         user = ctx.author
@@ -85,6 +86,31 @@ class Attack(commands.Cog):
         await ctx.send(embed=discord.Embed(
             description=f'You do not have a weapon with id `{wpn_id}` - please check your weapons with `.weapons`.'
         ))
+    
+    @commands.command()
+    async def switch(self, ctx: commands.Context):
+        """
+        Switches the weapon to the offhand weapon in the player's other hand. Tells the player that they do not have a weapon on the off hand if True.
+        """
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        message: discord.Message = ctx.message
+
+        bp = user_data["backpack"]
+
+        offhand_weapon: str = bp["weapons"]["offhand weapon"]
+        equipped_weapon: str = bp["weapons"]["equipped weapon"]
+
+        if offhand_weapon == None:
+            await message.add_reaction('❌')
+
+            return
+        
+        bp["weapons"]["offhand weapon"] = equipped_weapon
+        bp["weapons"]["equipped weapon"] = offhand_weapon
+        
+        await ctx.reply(f'Switched weapons - equipped weapon is now `{offhand_weapon}`, and offhand weapon is now `{equipped_weapon}`')
     
     @commands.command(aliases=['nwpn'])
     async def rename(self, ctx: commands.Context, prev_wpn_name: str, wpn_name: str):
@@ -323,13 +349,11 @@ class Attack(commands.Cog):
                 else: # RNG says that the user can only fight a singular monster
                     gdata = user_data["game"]
 
-                    base_monster, monster_rank = monster_tools.getMonsterFromPlayerLevel(gdata["level"])
+                    base_monster, monster_rank = MonsterTools.getMonsterFromPlayerLevel(gdata["level"])
 
-                    monster_data = await monster_tools.spawnMonster(ctx, user, base_monster, monster_rank)
+                    monster_data = await MonsterTools.spawnMonster(ctx, user, base_monster, monster_rank)
 
                     # now we can start accepting user commands
-                    # once preview monster is set to something else rather than None, the player is able to use all commands such as attack or shoot
-                    monsters["preview monster"] = monster_data
         
             while True: # while loop for ONE of the next coords
                 x = random.randint(current_cord[0] - radius, current_cord[0] + radius)

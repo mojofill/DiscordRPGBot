@@ -1,8 +1,9 @@
+from typing import Literal
 from dev.db import Database
 import discord,random
 from discord.ext import commands
 from dev.tools import tools
-from dev.api import db
+from dev.items import ItemsTool
 
 class Chests(commands.Cog):
     def __init__(self,client):
@@ -31,79 +32,43 @@ class Chests(commands.Cog):
         # }
         
         all_rewards = {}
-        # all_rewards = 
-        # {
-        #     category:{
-        #         reward:int
+        # all_rewards = {
+        #     (str) reward type:{
+        #         (str) reward:int
         #     }
+        #
+        # E.G.
+        #     "valuables":{
+        #         "opal":5
+        #     }            
         # }
 
-        def getRewardType(reward_name: str) -> str:
-            """Takes in `reward_name` and returns a string representing the type of reward it is - `sword` would return `weapon`"""
+        for chest_data in chests["chests"]:
+            
+            # chest_data = {
+            #     "type":str,
+            #     "items":dict
+            # }
 
-            # TODO: finish this
+            for reward in chest_data["items"]:
+                reward_type = ItemsTool.getRewardType(reward_name=reward)
 
-            items = {
-                # weapons
-                    # basic weapons
-                    "mogo club":"weapons",
-                    "mogo spear":"weapons",
-                    "mogo bat":"weapons",
-                    "wooden bat":"weapons",
-                    "wooden spiked bat":"weapons",
-                    "wooden spear":"weapons",
-                    "knight's broadsword":"weapons",
-                    "knight's claymore":"weapons",
-                    "steel spear":"weapons",
-                    "steel sword":"weapons",
-                    "steel mace":"weapons",
-                    "stick":"weapons",
-
-                    # elemental weapons
-                        # ranged - staffs
-                        "lightning staff":"weapons",
-                        "blaze staff":"weapons",
-                        "ice staff":"weapons",
-
-                    "flame sword":"weapons",
-                    "ice sword":"weapons",
-
-                    # ranged weapons
-
-                # bows
-                    "mogo bow":"bow",
+                if reward_type not in all_rewards:
+                    all_rewards[reward_type] = {reward:1}
                 
-                # valuables
-                    "emeralds":"valuables",
-                    "ruby":"valuables",
-                    "sapphire":"valuables",
-                    "topaz":"valuables",
-                    "opal":"valuables",
-                    "diamond":"valuables",
-                
-                # armor
+                else:
+                    all_rewards[reward_type][reward] += 1
+        
+        chests["chests"] = [] # clear data
 
-            }
+        import json
 
-            return items[reward_name]
+        await ctx.send(json.dumps(all_rewards, indent=4))
 
-        await ctx.send(chests)
-
-        for chest_type in chests["chests"]:
-            for chest_data in chests["chests"][chest_type]:
-                # chest_data = all rewards in each chest
-
-                for reward in chest_data:
-                    reward_type = getRewardType(reward_name=reward)
-
-                    if reward_type not in all_rewards:
-                        all_rewards[reward_type] = {reward:1}
-                    
-                    else:
-                        all_rewards[reward_type][reward] += 1
-                    
         for reward_type in all_rewards:
-            await tools.addItems(ctx, reward_type, all_rewards[reward_type]) # dumps all rewards into player backpack and send a message on it
+            rewards: dict = all_rewards[reward_type]
+
+            await tools.addGrabbableItems(ctx, reward_type, rewards) # dumps all rewards into player backpack and send a message on it
 
 def setup(client: commands.Bot):
     client.add_cog(Chests(client))

@@ -2,6 +2,16 @@
 On line 126 of cogs.thokim.boosts, we set a key,value pair with ID as a pair, and that id is an integer, which is not BSONSerializable. Change later if need be.
 
 As a reminder, before you publish this bot go to global search and search TODO to find all the things still need to be done.
+
+NOTE: every item when specifying for items quests and such MUST BE IN SINGULAR FORM
+
+E.G. apple ✅, apples ❌
+
+protection points: multiply by 0.008
+
+EG: leather helm has 4 protection points -> one leather helm worn takes off 4 * 0.008 = 0.032 of the incoming damage.
+
+NOTE: EVERY piece of armor the player is wearing has its durability incremented by -1
 """
 
 import discord
@@ -11,9 +21,12 @@ import json
 import asyncio
 from dotenv import load_dotenv
 from copy import deepcopy
-from dev.monster_tools import monster_tools
+from dev.MonsterTools import MonsterTools
+from dev.quests import QuestsTool
 from dev.tools import tools
 from dev.api import db
+from dev.chests import ChestsTool
+from dev.challenges import ChallengesTool
 from discord.ext import commands, tasks
 from discord import Embed
 from discord_slash import SlashCommand, SlashContext, ButtonStyle
@@ -21,10 +34,6 @@ from dev.db import Database
 from discord_slash.utils.manage_components import create_button, create_actionrow
 
 load_dotenv()
-
-class GameBot(commands.Bot):
-    def __init__(self, command_prefix, help_command='<default-help-command>', description=None, **options):
-        super().__init__(self, command_prefix, help_command=help_command, description=None, **options)
 
 client = commands.Bot(command_prefix='.')
 
@@ -86,7 +95,7 @@ async def user_not_frozen(ctx:commands.Context):
         return True
 
 @client.event
-async def on_command_error(ctx:commands.Context,error):
+async def on_command_error(ctx: commands.Context, error):
     if isinstance(error, commands.CheckFailure):
         await ctx.send('Error occured - check terminal.')
         
@@ -131,7 +140,7 @@ async def on_command_error(ctx:commands.Context,error):
                 gdata = db.game.find_one({"_id":user.id})
                 await ctx.send(f'{user.mention} you are still {gdata["status"]}!')
             
-        else:    
+        else:
             cogs_game_specific_commands = {
                 "Attack":['punch','equip','unequip','attack','raid'],
                 "Boosts":['consume'],
@@ -224,14 +233,15 @@ async def start(ctx:commands.Context):
     
     gdata = {
         "_id":user.id,
-        "realm":"thokim",
         "status":"stationary",
-        "default transport":"walking",
         "level":1,
         "running energy taken":30,
         "flying energy taken":30,
         "walk time":5,
-        "experience":0,
+        "game locked":False, # this is set to True, say, when the player is going through a dialogue, or something where the player is not supposed to be able to do anything else
+        "confined":False, # set this to True when the player is inside a place that does not allow it to move anywhere. Say you are inside a dungeon challenge, and you cannot leave this place if you use `.run`.
+        "xp":0,
+        "xp level":0,
         "can be scammed":True,
         "black market scams":20, # one of every 20 commands, you get scammed
         "unlocked dodge":False,
@@ -241,6 +251,27 @@ async def start(ctx:commands.Context):
         "rob damage":100,
         "rob steal":10, # gold
         "date registered":today
+    }
+
+    challenges = {
+        "_id":user.id,
+        "challenges":{
+            # "beginning stage":{}
+        }
+    }
+
+    adventure_hub = {
+        "rank":1,
+        "rewards":{
+            "xp gain":1,
+            # NO ITEM WILL BE TYPE ARMOR
+            "items":{
+                "weapons":{},
+                "bows":{},
+                "valuables":{},
+                "enhancement crystals":0 # int
+            }
+        }
     }
 
     hp = {
@@ -259,7 +290,9 @@ async def start(ctx:commands.Context):
         "_id":user.id,
         "location":"temple of power",
         "weather":None,
-        "cooking pot":False # set to True if there
+        "cooking pot":False, # set to True if there
+        "confined":False, # currently, the player is in the temple of power, where a lot of commands like .run are unable to be used
+        "realm":"thokim",
     }
 
     coliseum = {
@@ -277,19 +310,19 @@ async def start(ctx:commands.Context):
 
     armor = {
         "base":{ # this is the weapon's BASE armor stats
-            "helmet":{ # key as name of the weapon, type as the type of weapon it is
-                "type":"helmet",
-                "health":1000,
+            "leather helm":{ # key as name of the weapon, type as the type of weapon it is
+                "type":"helm",
+                "durability":1000,
                 "bonuses":None,
                 "protection":0.2
             },
-            "chestplate":{
+            "leather chestplate":{
                 "type":"chestplate",
-                "health":1000,
+                "durability":1000,
                 "bonuses":None,
                 "protection":0.5
             },
-            "greaves":{
+            "leather greaves":{
                 "type":"greaves",
                 "health":1000,
                 "bonuses":None,
@@ -297,21 +330,21 @@ async def start(ctx:commands.Context):
             }
         },
         "final":{ # takes in all potion effects too
-            "helmet":{
-                "type":"helmet",
-                "health":1000,
+            "helm":{
+                "type":"helm",
+                "durability":1000,
                 "bonuses":None,
                 "protection":0.2
             },
             "chestplate":{
                 "type":"chestplate",
-                "health":1000,
+                "durability":1000,
                 "bonuses":None,
                 "protection":0.5
             },
             "greaves":{
                 "type":"greaves",
-                "health":1000,
+                "durability":1000,
                 "bonuses":None,
                 "protection":0.3
             }
@@ -322,6 +355,7 @@ async def start(ctx:commands.Context):
         "_id":user.id,
         "gold nuggets":0,
         "gold bars":0,
+        "enhancement crystals":0,
         "shields":{
             "mogo shield":{
                 "health":100,
@@ -340,7 +374,8 @@ async def start(ctx:commands.Context):
             }, # contains all the weapons the user has
             "equipped weapon":None,
             "limit":7,
-            "damage increase multiply":1
+            "damage increase multiply":1,
+            "offhand weapon":None
         },
         "bows":{
             "bows":{},
@@ -348,6 +383,7 @@ async def start(ctx:commands.Context):
             "limit":7,
             "damage increase multiply":1,
         },
+        "weapon cooldown":False,
         "armor":armor,
         "armor ratio":tools.getArmorDamageReductionRatio(armor), # type dict, armor damage reduction participation compared to total protection
         "meals":{}, # these are for COOKED meals, not food that can be eaten raw
@@ -372,7 +408,8 @@ async def start(ctx:commands.Context):
             "bows":{},
             "loot":{},
             "food":{},
-            "valuables":{}
+            "valuables":{},
+            "armor":{}
         } # contains all the items that is grabbable by the player - after a while if the player does not take the item, it will despawn
     }
 
@@ -461,6 +498,7 @@ async def start(ctx:commands.Context):
 
     monsters = {
         "_id":user.id,
+        "monster souls":0,
         "preview monster":None,
         # "engaged monster":{}, # this is for the engaged monsters that are targetting and attacking the user
         "monster loop":False, # if this is False then hunting loop is stopped - else hunting loop should be continued
@@ -601,14 +639,7 @@ async def start(ctx:commands.Context):
 
     chests_data = {
         "_id":user.id,
-        "chests":{
-            # list of dicts - dicts contain chests data - when player uses .open, all chests in each category are opened
-            "monster camp":[],
-            "temple":[],
-            "treasure":[],
-            "wooden":[]
-
-        },
+        "chests":[],
         "unclaimed shipments":{
             "hourly":False,
             "daily":False,
@@ -644,18 +675,44 @@ async def start(ctx:commands.Context):
     # TODO: spend some time just writing down all the quests a player can have    
     quests = {
         "_id":user.id,
-        "main":{
-            "uncompleted":{},
-            "completed":{}
-        },
         "side":{
-            "uncompleted":{},
-            "completed":{}
+            "fight":{},
+            "item":{},
+            "location":{}
+        },
+        "main":{
+            "fight":{
+                # add and delete keys that show fight quests that need the player to fight a certain monster
+                
+                "mogosok":[
+                    {
+                        "name":"Kill the Mogosoks plaguing Thokim Town!",
+                        "amount":10,
+                        "progress":0,
+                        "required xp level":0,
+                        "reward":{"opal":3, "knight's sword":1, "xp":20},
+                        "required location":"thokim town"
+                    }
+                ]
+            },
+            "item":[
+                # add and delete keys that show item quests that need the player to find and get a certain item
+                {
+                    "quest name":"Get 10 apples for Henry.",
+                    "item":"apple",
+                    "required xp level":0,
+                    "amount":10,
+                    "progress":0,
+                    "reward":{"emerald":2},
+                    "required location":"thokim town"
+                }
+            ]
         },
         "daily":{},
-        "weekly":{}
+        "weekly":{},
 
         # TODO: create documentation for all quests in the game
+        "focused quest":None
     }
 
     async def tutorial():
@@ -740,6 +797,7 @@ async def start(ctx:commands.Context):
             db.quests.insert_one(quests)
             db.location.insert_one(location)
             db.coliseum.insert_one(coliseum)
+            db.adventure_hub.insert_one(adventure_hub)
         
         def setUserAccountInDatabase():
             """This sets the user's account in the dictionary that contains all the game information"""
@@ -763,6 +821,7 @@ async def start(ctx:commands.Context):
             immediate_falcon_duration_data = deepcopy(falcon_duration)
             immediate_quests_data = deepcopy(quests)
             immediate_location_data = deepcopy(location)
+            immediate_adventure_hub_data = deepcopy(adventure_hub)
 
             del immediate_game_data["date registered"]
 
@@ -783,7 +842,8 @@ async def start(ctx:commands.Context):
                 "special commands":immediate_special_commands_data,
                 "duration":immediate_duration_data,
                 "falcon duration":immediate_falcon_duration_data,
-                "quests":immediate_quests_data
+                "quests":immediate_quests_data,
+                "adventure hub":immediate_adventure_hub_data
             }
 
             Database.addUser(user, data) # sets the user's information in the database
@@ -793,26 +853,146 @@ async def start(ctx:commands.Context):
         
         user_data = Database.getStorageData(user)
 
-        await ctx.send("Basic tutorial\nTODO: Finish this. Even if it's in simple text representation.")
-
-        await ctx.send("You found a chest! Use `.open` to open up the chest and look at the content. TODO: Set up a method in tools.py that tells the player that they recieved a chest")
+        await ctx.send("Basic tutorial **(finish and refine this)**")
 
         chest_type = "wooden"
 
-        await tools.spawnChest(ctx, chest_type, {"opal":2, "stick":1})
+        beginning_chest = {
+            "type":"wooden",
+            "items":{"opal":2, "stick":1}
+        }
 
-        # somehow wait for the user to take the chest first before moving onto the next step
-        
+        await ChestsTool.spawnChest(ctx, chest_type, beginning_chest)
+
         chests = user_data["chests"]
 
-        async def nextStep():
-            """Tell the player to go fight some monsters now"""
+        def check():    
+            return len(chests["chests"]) == 0
+        
+        await tools.lockGame(user, check) # locks game until the chest is open
 
-            await ctx.send('Now that you have some opals and weapons, you have been assigned a quest: fight a single monster!\n\nDo some shit in code to write that the player has a quest to finish.')
+        await asyncio.sleep(1) # just so all the messages from .open will finish sending.
+
+        challenge_name = "Fight a Mogosok!"
+        
+        challenging_monsters = [{"mogosok":1}] # monster_name: monster_rank
+        
+        await ChallengesTool.startConfinedFightChallenge(challenge_name, ctx, challenging_monsters)
+
+        # response 1 and 2 are the same, make variable to reduce lines of code
+        data = {
+            "sentence":"Can I ask you, what were you doing in the Temple of Power? This place is sacred to the fallen hero.",
+            "responses":{
+                1:"I'm not sure, I just woke up in here..."
+            },
+            1:{
+                "sentence":"Whoa... What's your name kiddo?",
+                "responses":{
+                    1:"I think... It's Arrow?"
+                },
+                1:{
+                    "sentence":"..."
+                }
+            }
+        }
+
+        dialogue = {
+            "sentence":"Hey kiddo. Good job. I saw you from behind.",
+            "responses":{
+                1:"Thanks.",
+                2:"No sweat."
+            },
+            1:data,
+            2:data
+        }
+        
+        await tools.dialogue("Old man", client, ctx, dialogue)
+
+        await ctx.send('Journey in this world, defeat monsters, fight for your lives, ... add a shit ton of descriptives in here about the game...\n\nWelcome to the game! Use `.help` for more information on commands, and use `.gameplay` to find the basic way of how to play this game.')
+
+        dialogue = {
+            "sentence":"Hey, young man. Arrow, you said?",
+            "responses":{
+                1:"Yes, I think my name is Arrow."
+            },
+            1:{
+                "sentence":"Hmm...",
+                "responses":{
+                    1:"Is there something in my hair?"
+                },
+                1:{
+                    "sentence":"Now listen here. I'm not sure who you are, where you are from, what you are doing here, and how you defeated that monster so easily, but there's one thing I **do** know. You are extremely unprepared for the world outside. I trust you know who Neorjh is?",
+                    "responses":{
+                        1:"Of course.",
+                        2:"Who?"
+                    },
+                    1:{
+                        "sentence":"Then you know the danger right outside this door, because Neorjh killed nearly everyone on Thokim, and the 4 other realms as well. This place is a sanctuary for travelers. You were in the back, where no one is allowed, but in the front, travelers gather here in the thousands to pray to the goddess. Some pray for luck, some pray for a better life, some pray for their family to come back. This is why you always want to keep a `monster sensor` with you at all times.\nMonster sensors are crucial to your survival. Monsters will appear out of nowhere and surprise you, and if you know nothing about the monster, it is inevitable that you die. A monster sensor will alert you that a monster is nearby, AND it can also show you everything about the monster, from the weapon it is holding to it's max health. i can give you my own monster sensor, but...",
+                        "responses":{
+                            1:"Yeah?"
+                        },
+                        1:{
+                            "sentence":"I'm going to need payment! I'm not just going to give away my precious monster sensor!",
+                            "responses":{
+                                1:"Well, what kind of payment are we looking at?"
+                            },
+                            1:{
+                                "sentence":"There have been some monsters roaming around the `Temple of Power` for a long time, and I haven't found someone good enough to clear all 5 monster camps surrounding us. Clear those monster camps for me, and I promise you this `monster sensor` is yours. Oh, and I want the opals in the monster camp chests too. Once you cleared those monster camps, come back inside via `.questlocation` (`.ql` for short) to travel to the exact place the current focused quest wants you to be at."
+                            }
+                        },
+                    },
+                    2:{
+                        "sentence":"Oh my goodness. Have you been living under a rock for the past 50 years??! Neorjh killed nearly everyone on Thokim, and the 4 other realms as well. The few survivors huddled in a cave, only going outside during the darkest part of the night in order to sneak past monsters. Yet it coincides that the monsters are the strongest in the night, and many died. Those that survived managed to bring down the sheer amount of monsters from Neorjh's upbringing, and created a livable environment for humans to repopulate. Now, we are happy, but monsters still roam around. And you, Arrow, are completely exposed. You have nothing but a stick and some pants! What you need is a `monster sensor`. A monster sensor will alert you that a monster is nearby, AND it can also show you everything about the monster, from the weapon it is holding to it's max health. i can give you my own monster sensor, but...",
+                        "responses":{
+                            1:"Yeah?"
+                        },
+                        1:{
+                            "sentence":"I'm going to need payment! I'm not just going to give away my precious monster sensor!",
+                            "responses":{
+                                1:"Well, what kind of payment are we looking at?"
+                            },
+                            1:{
+                                "sentence":"There have been some monsters roaming around the `Temple of Power` for a long time, and I haven't found someone good enough to clear all 5 monster camps surrounding us. Clear those monster camps for me, and I promise you this `monster sensor` is yours. Oh, and I want the opals in the monster camp chests too. Once you cleared those monster camps, come back inside via `.questlocation` (`.ql` for short) to travel to the exact place the current focused quest wants you to be at."
+                            }
+                        },
+                    }
+                }
+            }
+        }
+
+        await tools.dialogue("Old Man", client, ctx, dialogue)
+
+        quest_name = "Clear the 5 Mogosok Camps!"
+        quest_type = "main"
+        monsters_in_camp = [
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            }
+        ]
+        
+        for i in range(5):
+            await QuestsTool.setFightQuestMonsterCamp(ctx, quest_name, quest_type, monsters_in_camp, session=True)
     
     await tutorial()
 
-    await ctx.send(f'{user.mention} made your account. ')
+    await ctx.send(f'{user.mention} made your account.')
 
 @client.command()
 async def clear(ctx: commands.Context):
@@ -839,6 +1019,7 @@ async def clear1(ctx: commands.Context):
 for folder in os.listdir('./cogs'):
     if folder == '__pychache__':
         pass
+
     else:
         for file in os.listdir(f'./cogs/{folder}'):
             if file.endswith('.py'):
