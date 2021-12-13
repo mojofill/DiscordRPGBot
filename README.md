@@ -1,7 +1,26 @@
 # Discord RPG storage for code
 This is my place to write out all the ideas I have, and document the ideas that I thought of but had no time to implement.
 
-## Monsters and Attack
+# Basic Gamplay
+There will be a lot of things here.
+
+# Quests
+An important part of the game are the quests. The player
+
+# Valuables
+Here are the valuables in the game.
+
+    NOTE: gems are the base currency of the game.
+
+Ranked in order from least to most worth
+1. Emeralds (30 gems)
+2. Ruby (90 gems)
+3. Sapphire (150 gems)
+4. Topaz (250 gems)
+5. Opal (350 gems)
+6. Diamond (500 gems)
+
+# Monsters and Attack
 Hunting monsters is easy in this game. All a player has to do is type `.hunt`. RPG Bot will then plop the player in a random coordinate on the monster map of the realm he is currently in, and spawn monsters on him. RPG Bot will only tell the player "Hey, found a monster for you to fight!" **Nothing more**. To preview the monster, player has to use `.monster` to look at the monster they are shown. `.monster` tells the player everything they need to know about the monster, from its ranking to the weapon it is using.
 
 ### How the code works.
@@ -21,3 +40,9 @@ The command `.monster` takes in data in `preview monster` and forms a `discord.E
 To fight the monster in `preview monster`, player must use `.engage` to engage with the monster and fight it.
 
 **Note**: if the player does not want to engage the monster, he must use `.skip` to skip the monster and continue in the monster loop.
+
+# Weapons
+## Elemental Weapons
+There are (currently) 6 elemental *weapons*, and 4 elemental *arrows*. Elemental weapons have special properties, and also has to do with the elements. For example, when it's raining, shock arrows and lightning swords deal more damage and have special properties. It is crucial for the player to know if a monster has elemental weapons to wear the correct protective armor or drink the right potion to countereffect the elemental weapon.
+
+## How the code is written:

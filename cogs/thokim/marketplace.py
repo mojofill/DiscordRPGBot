@@ -17,7 +17,7 @@ class Marketplace(commands.Cog):
     
     @commands.command(aliases=['market'])
     async def shop(self,ctx):
-        em = discord.Embed(title='Trade Center',description='Trade gold bars for game items here!',color=tools.lime)
+        em = discord.Embed(title='Trade Center',description='Trade gold bars for game items here!',color=discord.Color.dark_green())
         em.add_field(name='Scrolls',value="Different kinds of scrolls you can use to enchant your weapons and armor.",inline=False)
     
         em.add_field(name="Haste",value="""
@@ -130,6 +130,8 @@ class Marketplace(commands.Cog):
             else:
                 tools.travel(user,"marketplace")
         
+        # TODO finish all the ranges of id in this
+        # i should also reformat the code so different sections of the shop is given to the player
         item_type_dict = {
             (0,1):"gold bars",
             (1,12):"scrolls",

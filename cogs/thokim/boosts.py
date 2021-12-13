@@ -93,7 +93,7 @@ class Boosts(commands.Cog):
                     
                 user_data["backpack"]["weapons"] = bp["weapons"]
 
-            elif potion_type == 'damage reduce':
+            elif potion_type == 'protection':
                 hp = user_data["healthpoints"]
                 bp = user_data["backpack"]
                 
@@ -111,18 +111,18 @@ class Boosts(commands.Cog):
 
                         # we need to get a float with only 2 decimal points, no more.
 
-                        bp["armor"]["final"][armor]["damage reduce"] = final_armor_value_float
+                        bp["armor"]["final"][armor]["protection"] = final_armor_value_float
                 
                 storeRoundedData() # hover over function to see details
                 
-                # as of right now, we have three important values: rounded armor percentage, accurate armor percentage (ratio) of the old total damage reduce, and the final armor set in the database. we need to store the accurate data in the duration
+                # as of right now, we have three important values: rounded armor percentage, accurate armor percentage (ratio) of the old total protection, and the final armor set in the database. we need to store the accurate data in the duration
 
                 # dont need to update anything because the dictionaries i use are pointers, not a seperate dict
 
-                # now, all thats left to do is the turn the current active damage reduce potion (if there is one) off.
+                # now, all thats left to do is the turn the current active protection potion (if there is one) off.
                 
-                for _potion_id in boosts["all active potions"]: # only damage reduce potions need this
-                    if boosts["all active potions"][_potion_id]["type"] == 'damage reduce': # find all potions with damage reduce
+                for _potion_id in boosts["all active potions"]: # only protection potions need this
+                    if boosts["all active potions"][_potion_id]["type"] == 'protection': # find all potions with protection
                         loop_obj_id = duration_doc["potion duration"][_potion_id]["loop ID"]
 
                         duration_doc["current potion loops"][loop_obj_id] = False

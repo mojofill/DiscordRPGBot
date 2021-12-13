@@ -4,10 +4,12 @@ from typing import Literal
 import discord
 import time
 import gc
+import threading
 from discord.ext import commands
 from discord.ext import tasks
 from dev.api import db
 from dev.db import Database
+from dev.items import ItemsTool
 
 """There is something majorly wrong with the potion loops, with retrieving one of the past loops and restarting it. Fix this later."""
 
@@ -15,10 +17,37 @@ async def attack(ctx: commands.Context): # i completely forgot why i made this b
     """Attacks player and does all necessary functions."""
 
 class Tools:
+    ITEM_DESPAWN_TIME = 300 # 300 seconds = 5 minutes - ALL items will despawn at most after 5 minutes. Some may despawn earlier
+
+    class __GameException(Exception):
+        pass
+    
+    class PlayerConfined(__GameException):
+        pass
+
+    class PlayerGameLocked(__GameException):
+        pass
+
     def __init__(self):
         self.no_acc = 'You do not have an account. Make one with `.start`.'
         self.lime = discord.Color.from_rgb(144,238,144)
         self.safe_places = ['mineshaft','marketplace','grove','downtown','forge','vault','coliseum']
+
+
+    def checkPLayerNotConfined(self, ctx: commands.Context):
+        """Checks if player is contained in a certain place."""
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+        gdata = user_data["game"]
+
+        return gdata["confined"]
+
+    def checkPlayerGameNotLocked(self, ctx: commands.Context):
+        """Checks that the game is not locked for the `user`."""        
+        user_data = Database.getStorageData(ctx.author)
+        gdata = user_data.get('game')
+
+        return gdata["game locked"]
     
     def get_frozen_em(self,user) -> discord.Embed:
         """This returns an object, instance of `discord.Embed`. Contains instructions for user that is frozen."""
@@ -36,7 +65,7 @@ class Tools:
             return False
         
         return True
-    
+
     def user_at_required_realm(self,user,realm) -> bool:
         gdata = Database.getStorageData(user)["game"]
 
@@ -115,8 +144,137 @@ class Tools:
         """Method will dock 50 XP points from the user every time or she dies."""
         # just here because i dont want to have to write the entire thing out each time
 
-        gdata -= 50
+        gdata["xp"] -= 50
     
+    async def addXP(self, ctx: commands.Context, amount: int):
+        """Adds `XP` to player current experience."""
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+        gdata = user_data["game"]
+
+        gdata["xp"] += amount
+
+        await ctx.send(f'{user.mention} earned **{amount}** XP!')
+
+    async def dialogue(self, character: str, client: commands.Bot, ctx: commands.Context, dialogue: dict):
+        """
+        Takes in `client: commands.Bot` because method needs to access `commands.Bot.wait_for`.
+        Sends a message through `ctx`, and allows response from player.
+        
+        Example `dialogue` argument:
+        ```
+        {
+            "sentence":"Yo what are you doing here",
+            "responses":{
+                1:"nothing particular",
+                2:"peeing"
+            },
+            1:{
+                "sentence":"no, i think youre up to no good",
+                "responses":{
+                    1:"no???"
+                },
+                1:{
+                    "sentence":"Ah hah! I see your piss right there, you nasty ass."
+                    # no responses, end dialogue
+                }
+            },
+            2:{
+                "sentence":"BOI GET YOUR NASTY ASS MF OUT OF MY HOUSE AND PISS SOMEWHERE ELSE",
+                # no responses, end dialogue
+            }
+        }
+        ```
+        """
+        user: discord.User = ctx.author
+
+        class NoMoreResponses(Exception):
+            pass
+
+        user_data = Database.getStorageData(user)
+        gdata = user_data["game"]
+        gdata["game locked"] = True # lock game because player cannot do anything while inside a dialogue
+
+        async def recursivelyFinishDialogue(data: dict):
+            """Adds a single dialogue sequence, and once it is finished, tyr to move on. If unable to, then do not do recursion."""
+            sentence: str = data["sentence"]
+
+            try: 
+                responses: dict = data["responses"]
+            except: 
+                await ctx.send(f'**{character}**: {sentence}')
+                raise NoMoreResponses
+
+            msg = sentence + '\n'
+
+            numbered_reactions = {
+                '1️⃣':1,
+                '2️⃣':2,
+                '3️⃣':3,
+                '4️⃣':4,
+                '5️⃣':5,
+                '6️⃣':6,
+                '7️⃣':7,
+                '8️⃣':8,
+                '9️⃣':9,
+                '🔟':10
+            }
+            
+            def emojiFromNumber(number: int) -> str:
+                for reaction in numbered_reactions:
+                    if numbered_reactions[reaction] == number:
+                        return reaction
+
+            def numberFromEmoji(emoji: str) -> int:
+                return numbered_reactions[emoji]
+
+            reactions_to_add = []
+
+            for i in responses:
+                i: int # the number id for response
+
+                msg += f'\n{i}: {responses[i]}'
+
+                number_reaction = emojiFromNumber(i)
+                reactions_to_add.append(number_reaction)
+
+            m: discord.Message = await ctx.send(f'**{character}**: {msg}')
+            
+            for i in reactions_to_add:
+                await m.add_reaction(i)
+            
+            def check(reaction: discord.Reaction, _user: discord.User) -> bool:
+                nonlocal user
+
+                if reaction.emoji in reactions_to_add and _user.id == user.id:
+                    return True
+                else:
+                    return False
+            
+            try:
+                reaction, _user = await client.wait_for("reaction_add", check=check, timeout=30)
+            
+            except asyncio.TimeoutError: 
+                await m.reply(f"{user.mention} timed out ❌")
+                return
+
+            reaction: discord.Reaction
+
+            number = numberFromEmoji(reaction.emoji)
+
+            response = data["responses"][number]
+
+            await m.reply(content=f'**{user}** {response}', mention_author=False)
+
+            try:
+                await recursivelyFinishDialogue(data[number])
+            except NoMoreResponses:
+                gdata["game locked"] = False # unlock game because dialogue finished
+
+                return
+    
+        await recursivelyFinishDialogue(dialogue)
+
     def get_probabilities(self,weapon: str) -> dict:
         percentages = {
             "stick":0.95
@@ -164,104 +322,526 @@ class Tools:
                     probabilities[i] = percentage * (100 - previous_total)
             
         return probabilities, piecewise_first_x
+
+    async def NoArgumentGiven(self, ctx: commands.Context, *missing_args):        
+        msg = '`,'.join(missing_args)
+
+        msg = msg[:-1]
+
+        msg = '`' + msg + '`'
+        
+        await ctx.reply(f'❌ Missing arguments: {msg}. If you ever need help on how to use a command, use `.help <command name>`.')
     
-    async def addEquipment(self, ctx: commands.Context, user: discord.User, equipment_name: str, attack_type: str, shield_compatible: bool = True) -> dict:
+    async def lockGame(self, user: discord.User, check, period: float = 0.5):
+        """Locks the game AND code (inside method) for the user until check returns `True`. Check should be a function/method that returns `bool` - if `True` then unlock game. Method periodically checks if game can be unlocked, using `asyncio.sleep`."""
+
+        user_data = Database.getStorageData(user)
+
+        gdata = user_data.get('game')
+
+        gdata["game locked"] = True
+
+        while True:
+            if check():
+                gdata["game locked"] = False
+                return
+        
+            await asyncio.sleep(period)
+        
+    async def wait(self, check, period: float = 0.5):
         """
+        Waits for the `check` to return `True` - if not, do not continue code.
+        """
+        while True:
+            if check():
+                return True
+            
+            await asyncio.sleep(period)
+        
+    async def confinePlayer(self, user: discord.User, check):
+        """Confines a player to a certain location until `check` (function or method) is met."""
+
+        user_data = Database.getStorageData(user)
+        gdata = user_data["game"]
+        
+        gdata["confined"] = True
+        
+        period = 0.5 # time sleep
+        
+        while True:
+            if check():
+                gdata["confined"] = False
+                return
+            
+            await asyncio.sleep(period)
+
+    def getAttackType(self, base_equipment_name: str) -> str:
+        attack_types = {
+            # MELEE
+                "stick":"melee",
+                "mogo club":"melee",
+                "mogo club":"melee",
+                "mogo spear":"melee",
+                "mogo bat":"melee",
+                "wooden bat":"melee",
+                "wooden spiked bat":"melee",
+                "wooden spear":"melee",
+                "knight's broadsword":"melee",
+                "knight's claymore":"melee",
+                "steel spear":"melee",
+                "steel sword":"melee",
+                "steel mace":"melee",
+                "stick":"melee",
+            
+            # RANGED
+                "wooden bow":"ranged",
+                "lightning staff":"ranged",
+                "blaze staff":"ranged",
+                "ice staff":"ranged",
+                "flame sword":"ranged",
+                "ice sword":"ranged",
+            
+            # BOW
+            "mogo bow":"bow"
+        }
+
+        attack_type = attack_types[base_equipment_name]
+
+        return attack_type
+    
+    async def addGrabbableItems(self, ctx: commands.Context, type: str, items: dict):
+        """Adds an item to the player's grabbable items."""
+
+        user: discord.User = ctx.author
+
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        for i in items:
+            try: bp["grabbable items"][type][i] += items[i] # items[i] = amount of item to add
+            except KeyError: bp["grabbable items"][type][i] = 1
+
+        msg = ['`']
+
+        for i in items:
+            msg.append(f'{items[i]} {i}`, `')
+        
+        msg = ''.join(msg)
+
+        msg = msg[:-1]
+
+        await ctx.send(f'Added {msg} to your grabbable items - use `.grab` to grab these items.')
+
+        def despawnItems():
+            time.sleep(self.ITEM_DESPAWN_TIME)
+
+            for i in items:
+                if i in bp["grabbable items"][type]:
+                    del bp["grabbable items"][type][i]
+
+        threading.Thread(target=despawnItems).start()
+    
+    async def addItem(self, ctx: commands.Context, item: str, amount: int):
+        """Adds a singular item to the player's backpack."""
+
+        reward_type = ItemsTool.getRewardType(item)
+
+        data_add = {item: amount}
+
+        if reward_type == 'weapons' or reward_type == 'bows':
+            await self.addEquipments(ctx, data_add)
+        
+        elif reward_type == 'valuables':
+            await self.addValuables(ctx, data_add)
+        
+        elif reward_type == 'loot':
+            await self.addLoot(ctx, data_add)
+        
+        elif reward_type == 'armor':
+            await self.addArmors(ctx, data_add)
+        
+    async def addArmors(self, ctx: commands.Context, armors: dict):
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        # armors = {
+        #     "leather helm":int,
+        #     "leather chestpalte":int
+        # }
+
+        # do not need the amount of leather helm - you can only get one. instead, the data we need is the durability, the protection it gives, etc
+
+        def getArmorPieceData(piece: str) -> dict:
+            """
+            Returns:
+            ```
+            {
+                "durability":int,
+                "protection":float,
+                "type":Literal['helm', 'chestplate', 'greaves']
+                "bonuses":None or str
+            }
+            ```
+            """
+
+            # TODO: finish this
+
+            piece_data = {
+                "leather cap":{
+                    "type":"head",
+                    "durability":30,
+                    "protection":4
+                },
+                "leather shirt":{
+                    "type":"chest",
+                    "durability":40,
+                    "protection":8
+                },
+                "leather pants":{
+                    "type":"leg",
+                    "durability":20,
+                    "protection":3
+                },
+
+                # leather total: 0.12
+            }
+
+            return piece_data[piece]
+
+        bp: dict = user_data["backpack"]
+
+        msg = ''
+
+        for armor in armors:
+            bp["armor"]["base"][armor] = getArmorPieceData(armor)
+    
+    async def addValuables(self, ctx: commands.Context, items: dict):
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        bp: dict = user_data["backpack"]
+
+        msg = ''
+        
+        for item in items:
+            try: bp["grabbable items"]["valuables"][item] += items[item]
+            except KeyError: bp["valuables"][item] = items[item]
+
+            msg += f'\nAdded `{item}` to your valuables.'
+        
+        try:
+            await ctx.send(msg)
+        except discord.errors.HTTPException: # cannot send empty message
+            pass
+
+    async def addLoot(self, ctx: commands.Context, items: dict):
+        """
+            Adds loot to the player's loot. Loot consists of monster parts..
+        """
+
+    async def addRawFood(self, ctx: commands.Context, items: dict):
+        """
+            Adds food to the player's RAW food. If there's no more space for meals, then
+        """
+
+        user: discord.User = ctx.author
+
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        for i in items:
+            try:
+                bp["items"]["food"][i] += items[i]
+            
+            except KeyError: # this means that there isnt "i" type of food in the player's backpack yet, so add one
+                bp["items"]["food"][i] = items[i] # first item that they had, so give a singular piece
+    
+    async def addMeal(self, ctx: commands.Context, meal_name: str, amount: int):
+        """Adds a single meal to the player's backpack, because meals cannot stack on inventory"""
+
+        # TODO finish this part of the code
+    
+    async def addEquipments(self, ctx: commands.Context, equipments: dict = {}, preset_equipments: list = [], grabbable: bool = False) -> dict:
+        """
+        NOTE: `equipments` POINTS towards `bp["grabbable items"]["weapons"]` - not an individual object
+
+        NOTE: Method doesn't **actually** give the player equipment - it puts in the player's `grabbable items` `dict` in player' backpack.
+
         `shield_compatible` defaults `True`. Two handed weapons and all bows are not usable with shield.
 
-        Returns a `dict` containing all the weapon information:
+        NOTE: bows take no energy when used. However, durability is still taken away.
+
+        Adds a `dict` containing all the weapon information:
         ```
+        "name":str
         "damage":int
         "durability":int
         "attack time":int
         "attack type":str
-        "energy taken":int # NOTE: bows take NO energy
+        "energy taken":int
         "shield compatible":bool
         ```
 
-        NOTE - weapons are not finished. Finish adding weapons to weapon_stats
+        NOTE - weapons are not finished. Finish adding weapons to `weapon_stats`
         """
 
         # TODO: add the rest of the weapons
 
-        weapon_stats = {
+        user: discord.User = ctx.author
+
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        for equipment in preset_equipments:
+            equipment: dict
+
+            attack_type: str = equipment["attack time"]
+            name: str = equipment["name"]
+            
+            category = "weapons" if attack_type == "melee" else "bows"
+            
+            for category in ["weapons", "bows"]:
+                equipment_amount = 1 # counting this new addition it's 1, not 0
+                
+                for equipment in bp[category][category]:
+                    equipment: dict = bp[category][category][equipment]
+                    
+                    if equipment["name"] == name:
+                        equipment_amount += 1
+
+                if equipment_amount > 0:
+                    new_name = name + "|" + str(equipment_amount)
+                
+                else:
+                    new_name = name
+                
+            if grabbable:
+                bp["grabbable items"][category][new_name] = equipment # value is SUPPOSED to be type (int), but set as type (dict)
+                # easy "hacky" way to solve this problem is to build an exception where if the type is (dict) then it's preset data and simply do that
+
+                await ctx.send(f'Added `{name}` to your grabbable items - use `.grab` to grab these items.')
+
+            else:
+                bp[category][category][new_name] = equipment
+        
+                await ctx.send(f"Added **{name}** to your backpack.")
+
+        equipment_stats = {
             "stick":{
                 "damage":[1, 2],
                 "durability":[5, 10],
-                "attack time":0.3,
-                "attack type":attack_type,
+                "attack time":2,
+                "attack type":"melee",
                 "energy taken":1,
                 "shield compatible":True
             },
             "mogo club":{
                 "damage":[5, 10],
                 "durability":[20, 30],
-                "attack time":0.3,
-                "attack type":attack_type,
+                "attack time":2.5,
+                "attack type":"melee",
                 "energy taken":2,
                 "shield compatible":True
             }
         }
 
-        stats = weapon_stats[equipment_name]
-
-        user_data = Database.getStorageData(user)
-
-        bp = user_data["backpack"]
-
-        section = "weapons" if attack_type == 'melee' else "bows"
-
-        if not len(bp["weapons"][section]) == bp[section]["limit"]: # at limit - if add more will pass limit
-            msg = ''
-
-            if not equipment_name in bp[section][section]:
-                bp[section][section][equipment_name] = stats
-
-                msg += f'{user.mention} Added **{equipment_name}** to your backpack.'
+        # NOTE: the equipment name is the name of the BASE weapon name, such as sword. The "official" name of a weapon is the BASE weapon name and the number of the weapon name joined by '|'
             
-            else:
-                # weapon name already in weapons
-                def get_default_equipment_name() -> str:
-                    nonlocal equipment_name
-
-                    default_equipment_name = equipment_name
-
-                    found_copy_of_name = False
-
-                    for equipment_name in bp[section][section]:
-                        # checking the base name of weapons because default weapon name is set by finding all the same weapons and adding the amount plus one to it.
-                        if bp[section][section][equipment_name]["name"] == equipment_name:
-                            found_copy_of_name = True
-
-                            # split the weapon kind by splitter "|". The second part of the list depicts which weapon number that is. First weapon number is 1 by default
-                            weapon_number = int(equipment_name.split('|')[1])
-                            new_weapon_number = weapon_number + 1
-
-                            # when replaced, the new weapon name will look like (example weapon as sword)
-                            # sword|3
-                            break
-                    
-                    # this is the first weapon of its kind in the user's backpack, so no copies were found
-                    if found_copy_of_name == False:
-                        # just slap a "1" on the end because its the first one
-                        new_weapon_number = 1
-                    
-                    default_equipment_name += new_weapon_number
-                    
-                    return default_equipment_name
+        for equipment_name in equipments: # equipments = {"name": (int) amount}
+            if type(equipments[equipment_name]) == dict:
+                # preset data - simply set in backpack
                 
-                default_equipment_name = get_default_equipment_name()
-            
-                weapon_info_split = default_equipment_name.split('|')
+                data = equipments[equipment_name]
 
-                weapon_number = weapon_info_split[1]
+                name = data["name"]
+                attack_type = self.getAttackType(name)
 
-                msg += f"{user.mention} set your weapon to {weapon_info_split[0]}`{weapon_number}`.\nIf you wish to change your weapon name, use `.rename`"
+                section = "weapons" if attack_type == "melee" else "bows"
+
+                if len(bp[section][section]) == bp[section]["limit"]:
+                    await ctx.send(f'At limit - cannot add `{name}` to `{section}`')
+                
+                else:
+                    bp[section][section][equipment_name] = data
             
-            await ctx.send(msg)
-        
-        else: # cannot add more weapon - will pass limit if so
-            await ctx.send(f'{user.mention} cannot add `{equipment_name}` to your backpack, not enough space.')
+            else: # type(equipments[equipment_name]) == int => integer showing how many equipment to add
+                stats = equipment_stats[equipment_name]
+
+                stats["damage"] = random.randint(stats["damage"][0], stats["damage"][1])
+                stats["durability"] = random.randint(stats["durability"][0], stats["durability"][1])
+
+                attack_type = self.getAttackType(equipment_name)
+
+                section = "weapons" if attack_type == 'melee' else "bows"
+
+                if not len(bp[section][section]) == bp[section]["limit"]: # not at limit - if add more will pass limit
+                    final_equipment_name = None
+
+                    if not equipment_name in bp[section][section]: # weapon name not in the weapons - first type of weapon
+                        stats["name"] = equipment_name
+                        bp[section][section][f'{equipment_name}|1'] = stats
+
+                        msg = f'{user.mention} Added **{equipment_name}** to your weapons.'
+
+                        final_equipment_name = equipment_name + '|1'
+                    
+                    else:
+                        # weapon name already in weapons
+                        def get_default_equipment_name() -> str:
+                            nonlocal equipment_name
+
+                            default_equipment_name = equipment_name
+
+                            found_copy_of_name = False
+
+                            for equipment_name in bp[section][section]:
+                                # checking the base name of weapons because default weapon name is set by finding all the same weapons and adding the amount plus one to it.
+                                if bp[section][section][equipment_name]["name"] == equipment_name:
+                                    found_copy_of_name = True
+
+                                    # split the weapon kind by splitter "|". The second part of the list depicts which weapon number that is. First weapon number is 1 by default
+                                    weapon_number = int(equipment_name.split('|')[1])
+                                    new_weapon_number = weapon_number + 1
+
+                                    # when replaced, the new weapon name will look like (example weapon as sword)
+                                    # sword|3
+                                    break
+                            
+                            # this is the first weapon of its kind in the user's backpack, so no copies were found
+                            if found_copy_of_name == False:
+                                # just slap a "1" on the end because its the first one
+                                new_weapon_number = 1
+                            
+                            default_equipment_name += new_weapon_number
+                            
+                            return default_equipment_name
+                        
+                        default_equipment_name = get_default_equipment_name()
+                    
+                        weapon_info_split = default_equipment_name.split('|')
+
+                        weapon_number = weapon_info_split[1]
+
+                        msg = f"{user.mention} set your weapon to {weapon_info_split[0]}`{weapon_number}`.\nIf you wish to change your weapon name, use `.rename`"
+
+                        final_equipment_name = default_equipment_name
+                    
+                    if attack_type == 'melee':
+                        category = 'weapons'
+                    
+                    else:
+                        category = 'bows'
+
+                    def getEquipmentData() -> dict:
+                        # TODO: finish all this
+                        two_handed_weapon_attack_time = 1.5
+                        spear_attack_time = 0.15
+                        one_handed_weapon_attack_time = 0.25
+
+                        two_handed_weapon_energy_taken = 25
+                        one_handed_weapon_energy_taken = 10
+                        spear_energy_taken = 15
+
+                        equipment_datas = {
+                            # MELEE
+                                "mogo club":{
+                                    "damage":[2, 5],
+                                    "durability":[10, 20],
+                                    "attack time":one_handed_weapon_attack_time,
+                                    "energy taken":one_handed_weapon_energy_taken
+                                },
+                                "mogo spear":{
+                                    "damage":[2, 5],
+                                    "durability":[10, 20],
+                                    "attack time":two_handed_weapon_attack_time,
+                                    "energy taken":spear_energy_taken
+                                },
+                                "mogo bat":{
+                                    "damage":[10, 20],
+                                    "durability":[20, 30],
+                                    "attack time":two_handed_weapon_attack_time,
+                                    "energy taken":two_handed_weapon_energy_taken
+                                },
+                                "wooden bat":{
+                                    "damage":[1, 5],
+                                    "durability":[8, 16],
+                                    "attack time":two_handed_weapon_attack_time,
+                                    "energy taken":two_handed_weapon_energy_taken
+                                },
+                                "wooden spiked bat":{
+                                    "damage":[10, 15],
+                                    "durability":[10, 20],
+                                    "attack time":two_handed_weapon_attack_time,
+                                    "energy taken":two_handed_weapon_energy_taken
+                                },
+                                "wooden spear":{
+                                    "damage":[1, 5],
+                                    "durability":[5, 10],
+                                    "attack time":spear_attack_time,
+                                    "energy taken":spear_energy_taken
+                                },
+                                "knight's broadsword":{
+                                    "damage":[20, 40],
+                                    "durability":[30, 50],
+                                    "attack time":one_handed_weapon_attack_time,
+                                    "energy taken":one_handed_weapon_energy_taken
+                                },
+                                "knight's claymore":{
+                                    "damage":[30, 60],
+                                    "durability":[30, 50],
+                                    "attack time":two_handed_weapon_attack_time,
+                                    "energy taken":two_handed_weapon_energy_taken
+                                },
+                                "steel spear":{
+                                    "damage":[25, 40],
+                                    "durability":[25, 40],
+                                    "attack time":spear_attack_time,
+                                    "energy taken":spear_energy_taken
+                                },
+                                "steel sword":{
+                                    "damage":[25, 40],
+                                    "durability":[30, 45],
+                                    "attack time":one_handed_weapon_attack_time,
+                                    "energy taken":one_handed_weapon_energy_taken
+                                },
+                                "steel mace":{
+                                    "damage":[40, 70],
+                                    "durability":[45, 60],
+                                    "attack time":two_handed_weapon_attack_time,
+                                    "energy taken":two_handed_weapon_energy_taken
+                                },
+                                "stick":{
+                                    "damage":[2, 3],
+                                    "durability":[5, 8],
+                                    "attack time":one_handed_weapon_attack_time,
+                                    "energy taken":one_handed_weapon_energy_taken
+                                },
+                            
+                            # RANGED
+
+                        }
+
+                        equipment_data = equipment_datas[equipment_name]
+
+                        damage: int = random.randint(equipment_data["damage"][0], equipment_data["damage"][1])
+                        durability: int = random.randint(equipment_data["durability"][0], equipment_data["durability"][1])
+
+                        equipment_data["damage"] = damage
+                        equipment_data["durability"] = durability
+
+                        equipment_data["name"] = equipment_name
+                        
+                        return equipment_data
+                    
+                    bp[category][category][final_equipment_name] = getEquipmentData()
+                    
+                    await ctx.send(msg)
+                
+                else: # cannot add more weapon - will pass limit if so
+                    await ctx.send(f'{user.mention} cannot add `{equipment_name}` to your backpack, not enough space.')
 
     def getDurabilityOfWeapon(self, *, wpn_str: str) -> int:
         """This method gets the durability of weapon given by the `wpn_str` parameter."""
@@ -275,19 +855,19 @@ class Tools:
         return random.randint(ranges[0], ranges[1])
         
     def getIfWeaponIsRepairable(self, wpn_str: str) -> bool:
-        """This method returns a `bool`, `True` if weapon can be repaired and `False1 if not."""
+        """This method returns a `bool`, `True` if weapon can be repaired and `False` if not."""
     
     def getArmorDamageReductionRatio(self,data:dict) -> dict:
         """Method returns a `dict`, representing a ratio consisting of the damage reduction participation of every piece of armor in the data, compared to the `total_damage_reduce`."""
         total_damage_reduce = 0
         
         for armor in data["base"]:
-            total_damage_reduce += data["base"][armor]["damage reduce"]
+            total_damage_reduce += data["base"][armor]["protection"]
         
         ratio = {}
 
         for armor in data["base"]:
-            ratio[armor] =  data["base"][armor]["damage reduce"] / total_damage_reduce # part over whole - simple fraction/ratio
+            ratio[armor] =  data["base"][armor]["protection"] / total_damage_reduce # part over whole - simple fraction/ratio
         
         return ratio
     
@@ -310,7 +890,7 @@ class Tools:
                         '__monster__ __verb__ __user__, crushing __user__\'s dreams of becoming the greatest.',
                         '__user__ played themself and got __verb__ by __monster__'
                     ],
-                    "bow":[
+                    "ranged":[
                         '__user__ got __verb__ whilst attacking __monster__'
                     ]
                 },
@@ -319,7 +899,7 @@ class Tools:
                         '__monster__ __verb__ __user__ and killed them.',
                         '__monster__ completely wrecked __user__, __verb__ them, dealing catastrophic damage.'
                     ],
-                    "bow":[
+                    "ranged":[
                         '__monster__ shot your fucking ass __user__'
                     ]
                 }
@@ -389,7 +969,7 @@ class Tools:
                     "mythical":[95,99],
                     "legendary":[99,100]
                 },
-                "damage reduce":{
+                "protection":{
                     "common":[0,45],
                     "uncommon":[45,70], # finish this, go down and add potion rarity in boosts.local potions, and finish code in falcon.py
                     "rare":[70,85],
@@ -471,7 +1051,7 @@ class Tools:
                     "mythical":[6,7],
                     "legendary":[7,8]
                 },
-                "damage reduce":{
+                "protection":{
                     "common":0.9, # this is the total reduction of the armor set.
                     "uncommon":0.9, # if i want this to be a real damage
                     "rare":0.85,
@@ -514,7 +1094,7 @@ class Tools:
                     "mythical":[20,35],
                     "legendary":[30,40]
                 },
-                "damage reduce":{
+                "protection":{
                     "common":0.9, # this is the total reduction of the armor set.
                     "uncommon":0.9, # if i want this to be a real damage
                     "rare":0.85,
@@ -541,7 +1121,7 @@ class Tools:
             else:
                 value_range = value_from_type_and_rarity[potion_type][potion_rarity]
 
-            if potion_type == "damage reduce":
+            if potion_type == "protection":
                 value = value_range
 
             else:
@@ -639,7 +1219,7 @@ class Tools:
                     
                     db.mines.update_one({"_id":user.id},{"$set":{"wagon size":mines["wagon.original size"]}})
                 
-                elif potion_type == 'damage reduce':
+                elif potion_type == 'protection':
                     bp = db.backpack.find_one({"_id":user.id})
 
                     armor_ratio = bp["armor ratio"]
@@ -649,14 +1229,14 @@ class Tools:
                     base_total_damage_reduction = 0
 
                     for armor in bp["armor"]["base"]:
-                        base_total_damage_reduction += bp["armor"]["base"][armor]["damage reduce"]
+                        base_total_damage_reduction += bp["armor"]["base"][armor]["protection"]
 
                     for armor in bp["armor"]["final"]:
                         armor_damage_reduction_participation = armor_ratio[armor] # this is a float for the percentage of damage reduction the armor has compared to the total damage reduction
 
                         base_armor_damage_reduce_value = armor_damage_reduction_participation * base_total_damage_reduction
 
-                        bp["armor"]["final"][armor]["damage reduce"] = base_armor_damage_reduce_value
+                        bp["armor"]["final"][armor]["protection"] = base_armor_damage_reduce_value
                     
                     db.backpack.update_one({"_id":user.id},{"$set":{"armor.final":bp["armor"]["final"]}})
                 
@@ -726,7 +1306,7 @@ class Tools:
 
                     del queue[0] # removes the next loop from the queue as it is already activated
 
-                    loop = self.get_potion_duration_subtract_loop(user=user,potion_id=next_potion_ID,falcon=falcon) # recursion to start new loop. dude. this starts an entirely new loop, completely unrelated with the old damage reduce potion.
+                    loop = self.get_potion_duration_subtract_loop(user=user,potion_id=next_potion_ID,falcon=falcon) # recursion to start new loop. dude. this starts an entirely new loop, completely unrelated with the old protection potion.
 
                     loop.start()
                 
@@ -769,9 +1349,9 @@ class Tools:
                         
                         db.falcon.update_one({"_id":user.id},{"$set":{f"abilities":falcon["abilities"]}})
 
-                    elif potion_type == 'damage reduce':
+                    elif potion_type == 'protection':
                         for armor_piece in falcon["armor"]:
-                            falcon["armor"][armor_piece]["damage reduce"]
+                            falcon["armor"][armor_piece]["protection"]
 
                             """I need to set up some sort of plan for affecting stats and reverting to what it was before"""
             
@@ -791,8 +1371,8 @@ class Tools:
         
         else:
             wpn_attack_times = {
-                "mogo club":0.5, # we can change this later on
-                "mogo spear":0.3,
+                "mogo club":2.5, # we can change this later on
+                "mogo spear":1.5,
                 "mogo bow":1.5
             }
 
@@ -905,7 +1485,7 @@ class Tools:
                     wait = weather["risks"]["wait"]
                     @tasks.loop(seconds=wait)
                     async def tornado_loop():
-                        tornado_em = discord.Embed(color=self.lime)
+                        tornado_em = discord.Embed(color=discord.Color.dark_green())
 
                         # deal the recurring damage to the user
                         nonlocal weather
@@ -977,7 +1557,8 @@ class Tools:
                         wait = weather["risks"]["wait"]
                         @tasks.loop(seconds=wait)
                         async def thunderstorm_loop():
-                            em = discord.Embed(color=tools.lime)
+                            em = discord.Embed(                        tornado_em = discord.Embed(color=discord.Color.dark_green())
+)
                             gdata = db.game.find_one({"_id":user.id})
                             
                             # also do soemthing about other locations look to the left side of coding screen
@@ -1092,85 +1673,45 @@ class Tools:
 
         return f"{user.mention} teleported to {realm.title()}."
 
-    def travel(self,user:discord.User,location:str) -> str:
-        "Method will return the string `walking` if the user is walking. If not, then method will run some code, and return a message that says the user ran or flew somewhere."
-        gdata = db.game.find_one({"_id":user.id})
+    async def travel(self, ctx: commands.Context, location_str: str):
+        """
+        Walk the player to a certain place.
+        Check if the player has a quest here in this location.
+        """
         
-        transport_method = gdata["default transport"]
+        user: discord.User = ctx.author
 
-        energytaken = None
-
-        weather = db.climate.find_one({"_id":"weather"})
-
-        print(weather)
-
-        if weather["risk type"] != "safe":
-            self.deal_weather_damage()
-
-        if transport_method == 'running':
-            energytaken = gdata["running energy taken"]
-            db.healthpoints.update_one({"_id":user.id},{"$inc":{"energy":-1*energytaken}})
-        
-        elif transport_method == 'flying':
-            energytaken = gdata["flying energy taken"]
-            db.falcon.update_one({"_id":user.id},{"$inc":{"energy":energytaken}})
-
-        else:
-            return "walking"
-        
-        travel_verb_dict = {
-            "walking":"walked",
-            "running":"ran",
-            "flying":"flew"
-        }
-
-        travel_verb = travel_verb_dict[transport_method]
-
-        db.game.update_one({"_id":user.id},{"$set":{"location":location}})
-
-        msg = f'{user.mention} has {travel_verb} to {location} and spent {energytaken}.'
-
-        return msg
-
-
-    async def walkuser(self, ctx: commands.Context, user:discord.User, location:str) -> None:
-        """NOTE - ASYNC FUNCTION. USE AWAIT. Methods runs code to sleep for however long the user's walking time is, and then saves the user's location as the location given."""
         user_data = Database.getStorageData(user)
-
         gdata = user_data["game"]
+        location = user_data["location"]
 
-        await ctx.send(f'{user.mention} You are walking to {location}...')
+        if location["confined"]:
+            raise self.PlayerConfined
 
-        gdata["status"] = "walking"
-
+        m: discord.Message = await ctx.send(f"{user.mention} Walking to {location_str}...")
+        
         await asyncio.sleep(gdata["walk time"])
 
-        await ctx.send(f'{user.mention} You have arrived at {location}.')
+        await m.edit(f'{user.mention} You have arrived at {location_str}!')
 
-        gdata["location"] = location
+        location["location"] = location_str
 
-    def finished_quest(self,quest_id:int,user:discord.User) -> bool:
-        """Method returns `True` if the user has finished the quest of the given `quest_id`, and `False` if not."""
-        quests = db.quests
-        # GET REQUIRED AMOUNT OF QUEST_ID, COMPARE PROGRESS, TELL IF USER HAS FINISHED QUEST YET. GO TO attack.py AND FINISH CODE THERE
+        quests = user_data["quests"]
 
-        quest = quests.find_one({"_id":user.id})
+        for quest_type in ["main", "side"]:
+            for quest in quests[quest_type]:
+                try:
+                    quest_location = quests[quest_type][quest]["location"]
+                    if location_str == quest_location and quests[quest_type][quest]["progress"] == 0 and gdata["xp level"] >= quests[quest_type][quest]["required xp level"]:
+                        
+                        # current location equal to quest location
+                        # quest progress is 0
+                        # xp level at or above required xp level for quest
 
-        if quest["quests"][quest_id]["progress"] == quest["quests"][quest_id]["amount required"]:
-            return True
-        
-        return False
+                        await ctx.send(f"{quest_type.title()} quest unlocked! Check `.{quest_type}` for more information.")
 
-
-    def del_quest(self,quest_id:int,user:discord.User) -> None:
-        """Method deletes the dict value of the key `quest_id`."""
-        quests_ = db.quests
-        quests = quests_.find_one({"_id":user.id})
-
-        del quests["quests"][quest_id]
-
-        quests_.update_one({"_id":user.id},{"$set":{"quests":quests["quests"]}})
-        
+                except KeyError:
+                    pass
 
     def hasAcc(self,user:discord.User) -> bool:
         """Method returns `True` if the user has an account, and `False` if not."""
@@ -1219,7 +1760,7 @@ class Tools:
         total_damage_reduce_percentage = 0
         
         for armor_piece in falcon["armor"]:
-            total_damage_reduce_percentage += falcon["armor"][armor_piece]["damage reduce"]
+            total_damage_reduce_percentage += falcon["armor"][armor_piece]["protection"]
         
         final_damage = incoming_damage * (1-total_damage_reduce_percentage) # this is the equivalent of dmg = dmg * (100-x)%
 
@@ -1236,14 +1777,14 @@ class Tools:
         for armor in hp["equipped armor"]:
             # go through all the armor in the user's hp (what the user is wearing right now is always in the healthpoints collection) and calculate entire armor reduce
 
-            final_reduce += hp["equipped armor"][armor]["damage reduce"]
+            final_reduce += hp["equipped armor"][armor]["protection"]
 
         # subtract reduce by one, because percentage and multiply that to the damage, which reduces it
         final_damage = (1-final_reduce) * damage
 
         return final_damage
     
-    async def all_quest_and_chest_actions(self,ctx,command_name:str,user:discord.User) -> str:
+    async def all_quest_and_chest_actions(self, ctx, command_name: str, user: discord.User) -> str:
         """This is a coroutine - use `await`. Method will finish all the quest actions, deleteing or giving chests. Returns a final message for bot to send."""
         command_quests = self.quests_with_commands_list(command_name,user)
 
@@ -1259,95 +1800,5 @@ class Tools:
                     self.del_quest(quest_id,user)
 
                     await ctx.send(msg)
-            
-    def drop(self,monster_type:str,item_type:str="parts") -> list:
-        """Returns a list of all the drops the given monster has dropped for the user. Code currently doesn't adjust to user's use of luck potions, but should be taken in account. If looking for dropped weapons, then pass in `item_type="weapons"`. `item_type` defaults to `"parts"`. Finish code later."""
-
-        if item_type == 'parts':
-            monster_drops = {
-                "goblin":{
-                    "sample size":1,
-                    "choices":{
-                        "goblin horn":[0,1]
-                    }
-                },
-                "minotaur":{
-                    "sample size":3,
-                    "choices":{
-                        "minotaur horn":[0,3]
-                    },
-                },
-                "cyclops":{
-                    "sample size":1,
-                    "choices":{
-                        "cyclops eye":[0,1]
-                    }
-                },
-                "ogre":{
-                    "sample size":3,
-                    "choices":{
-                        "tough ogre skin":[0,3]
-                    }
-                },
-                "chimera":{
-                    "sample size":3,
-                    "choice":{
-                        "chimera serpent tail":[0,1],
-                        "chimera lion mane":[1,2]
-                    }
-                },
-                "basilisk":{
-                    "sample size":1,
-                    "choices":{
-                        "basilisks fang":[0,1]      
-                    }
-                },
-                "mogosok":{
-                    "sample size":2,
-                    "choices":{
-                        "mogosok fang":[0,1]
-                    }
-                },
-                "drasok":{
-                    "sample size":6,
-                    "choices":{
-                        "drasok guts":[0,4],
-                        "drasok wings":[4,5]
-                    }
-                },
-                "bugosok":{
-                    "sample size":5,
-                    "choices":{
-                        "bugosok bone":[0,2],
-                        "bugosok claw":[0,4]
-                    }
-                },
-                "jawsok":{
-                    "sample size":5,
-                    "choices":{
-                        "jawsok fang":[0,3],
-                        "jawsok horn":[2,4]
-                    }
-                },
-                "stormsok":{
-                    "sample size":5,
-                    "choices":{
-                        "galestaff":[0,1],
-                        "stormsok ballon":[0,5]
-                    }
-                }
-            }
-
-            items_dropped = []
-
-            num = random.randint(1,monster_drops[monster_type])
-            
-            for item in monster_drops[monster_type]["choices"]:
-                drop_range = monster_drops[monster_type][item]
-
-                if num in range(drop_range[0]) or num == drop_range[0]:
-                    items_dropped.append(item)
-                
-            return items_dropped
 
 tools = Tools()

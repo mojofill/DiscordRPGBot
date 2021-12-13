@@ -1,7 +1,17 @@
 """
 On line 126 of cogs.thokim.boosts, we set a key,value pair with ID as a pair, and that id is an integer, which is not BSONSerializable. Change later if need be.
 
-As a reminder, before you publish this bot go to global search and search TODO to find all the things still need to be done
+As a reminder, before you publish this bot go to global search and search TODO to find all the things still need to be done.
+
+NOTE: every item when specifying for items quests and such MUST BE IN SINGULAR FORM
+
+E.G. apple ✅, apples ❌
+
+protection points: multiply by 0.008
+
+EG: leather helm has 4 protection points -> one leather helm worn takes off 4 * 0.008 = 0.032 of the incoming damage.
+
+NOTE: EVERY piece of armor the player is wearing has its durability incremented by -1
 """
 
 import discord
@@ -9,12 +19,14 @@ import datetime
 import os
 import json
 import asyncio
-import random
-from discord import Message
 from dotenv import load_dotenv
 from copy import deepcopy
+from dev.MonsterTools import MonsterTools
+from dev.quests import QuestsTool
 from dev.tools import tools
 from dev.api import db
+from dev.chests import ChestsTool
+from dev.challenges import ChallengesTool
 from discord.ext import commands, tasks
 from discord import Embed
 from dev.db import Database
@@ -44,7 +56,6 @@ def in_case_of_crash(ctx:commands.Context):
     
     else: # this just means its all good, nothing crashed
         return True
-    
 
 @client.check # add check name attr - inheritance new class etc
 async def hasAcc(ctx:commands.Context):
@@ -82,7 +93,7 @@ async def user_not_frozen(ctx:commands.Context):
         return True
 
 @client.event
-async def on_command_error(ctx:commands.Context,error):
+async def on_command_error(ctx: commands.Context, error):
     if isinstance(error, commands.CheckFailure):
         await ctx.send('Error occured - check terminal.')
         
@@ -127,7 +138,7 @@ async def on_command_error(ctx:commands.Context,error):
                 gdata = db.game.find_one({"_id":user.id})
                 await ctx.send(f'{user.mention} you are still {gdata["status"]}!')
             
-        else:    
+        else:
             cogs_game_specific_commands = {
                 "Attack":['punch','equip','unequip','attack','raid'],
                 "Boosts":['consume'],
@@ -220,15 +231,15 @@ async def start(ctx:commands.Context):
     
     gdata = {
         "_id":user.id,
-        "realm":"thokim",
-        "location":"home",
         "status":"stationary",
-        "default transport":"walking",
         "level":1,
         "running energy taken":30,
         "flying energy taken":30,
         "walk time":5,
-        "experience":0,
+        "game locked":False, # this is set to True, say, when the player is going through a dialogue, or something where the player is not supposed to be able to do anything else
+        "confined":False, # set this to True when the player is inside a place that does not allow it to move anywhere. Say you are inside a dungeon challenge, and you cannot leave this place if you use `.run`.
+        "xp":0,
+        "xp level":0,
         "can be scammed":True,
         "black market scams":20, # one of every 20 commands, you get scammed
         "unlocked dodge":False,
@@ -240,6 +251,27 @@ async def start(ctx:commands.Context):
         "date registered":today
     }
 
+    challenges = {
+        "_id":user.id,
+        "challenges":{
+            # "beginning stage":{}
+        }
+    }
+
+    adventure_hub = {
+        "rank":1,
+        "rewards":{
+            "xp gain":1,
+            # NO ITEM WILL BE TYPE ARMOR
+            "items":{
+                "weapons":{},
+                "bows":{},
+                "valuables":{},
+                "enhancement crystals":0 # int
+            }
+        }
+    }
+
     hp = {
         "_id":user.id,
         "health":100, # base health the user has
@@ -249,6 +281,16 @@ async def start(ctx:commands.Context):
         "fist steal range":[1000,2000], #??? should i keep?
         "wet":False, # this means if the user is currently in the rain or not
         "energy gain time":1 # every second the user gains a portion of energy back - MIGHT BE TOO MUCH FOR THE BOT. will probably just set a larger energy, and remind the user to replenish his or her energy every once in a while
+    }
+
+    # TODO add more here
+    location = { # everything about the current location the player is in - from the weather to if there's a cooking pot near him
+        "_id":user.id,
+        "location":"temple of power",
+        "weather":None,
+        "cooking pot":False, # set to True if there
+        "confined":False, # currently, the player is in the temple of power, where a lot of commands like .run are unable to be used
+        "realm":"thokim",
     }
 
     coliseum = {
@@ -266,43 +308,43 @@ async def start(ctx:commands.Context):
 
     armor = {
         "base":{ # this is the weapon's BASE armor stats
-            "helmet":{ # key as name of the weapon, type as the type of weapon it is
-                "type":"helmet",
-                "health":1000,
+            "leather helm":{ # key as name of the weapon, type as the type of weapon it is
+                "type":"helm",
+                "durability":1000,
                 "bonuses":None,
-                "damage reduce":0.2
+                "protection":0.2
             },
-            "chestplate":{
+            "leather chestplate":{
                 "type":"chestplate",
-                "health":1000,
+                "durability":1000,
                 "bonuses":None,
-                "damage reduce":0.5
+                "protection":0.5
             },
-            "greaves":{
+            "leather greaves":{
                 "type":"greaves",
                 "health":1000,
                 "bonuses":None,
-                "damage reduce":0.3
+                "protection":0.3
             }
         },
         "final":{ # takes in all potion effects too
-            "helmet":{
-                "type":"helmet",
-                "health":1000,
+            "helm":{
+                "type":"helm",
+                "durability":1000,
                 "bonuses":None,
-                "damage reduce":0.2
+                "protection":0.2
             },
             "chestplate":{
                 "type":"chestplate",
-                "health":1000,
+                "durability":1000,
                 "bonuses":None,
-                "damage reduce":0.5
+                "protection":0.5
             },
             "greaves":{
                 "type":"greaves",
-                "health":1000,
+                "durability":1000,
                 "bonuses":None,
-                "damage reduce":0.3
+                "protection":0.3
             }
         }
     }
@@ -311,6 +353,7 @@ async def start(ctx:commands.Context):
         "_id":user.id,
         "gold nuggets":0,
         "gold bars":0,
+        "enhancement crystals":0,
         "shields":{
             "mogo shield":{
                 "health":100,
@@ -329,7 +372,8 @@ async def start(ctx:commands.Context):
             }, # contains all the weapons the user has
             "equipped weapon":None,
             "limit":7,
-            "damage increase multiply":1
+            "damage increase multiply":1,
+            "offhand weapon":None
         },
         "bows":{
             "bows":{},
@@ -337,12 +381,34 @@ async def start(ctx:commands.Context):
             "limit":7,
             "damage increase multiply":1,
         },
+        "weapon cooldown":False,
         "armor":armor,
-        "armor ratio":tools.getArmorDamageReductionRatio(armor), # type dict, armor damage reduction participation compared to total damage reduce
+        "armor ratio":tools.getArmorDamageReductionRatio(armor), # type dict, armor damage reduction participation compared to total protection
         "meals":{}, # these are for COOKED meals, not food that can be eaten raw
-        "items":{}, # items in here range from monster parts to apples
+        "items":{ # items in here range from monster parts to apples
+            "monster parts":{
+                # name of monster part: amount of monster parts
+                # "mogo claw":2
+            },
+            "food":{
+                # name of food: amount of food
+                # "apples":10
+            },
+            "meals":{
+                # name of meal: amount of that meal
+                # "hearty steak":4
+            }
+        },
         "unfinished potions":{},
-        "scrolls":{}
+        "scrolls":{},
+        "grabbable items":{
+            "weapons":{},
+            "bows":{},
+            "loot":{},
+            "food":{},
+            "valuables":{},
+            "armor":{}
+        } # contains all the items that is grabbable by the player - after a while if the player does not take the item, it will despawn
     }
 
     vault = {
@@ -358,17 +424,17 @@ async def start(ctx:commands.Context):
         "armor":{
             "helmet":{
                 "name":"helmet",
-                "damage reduce":0.03,
+                "protection":0.03,
                 "health":50
             },
             "chestplate":{
                 "name":"chestplate",
-                "damage reduce":0.07,
+                "protection":0.07,
                 "health":65
             },
             "wing shield":{
                 "name":"wing shield",
-                "damage reduce":0.05,
+                "protection":0.05,
                 "health":50
             }
         },
@@ -430,12 +496,14 @@ async def start(ctx:commands.Context):
 
     monsters = {
         "_id":user.id,
-        "preview monster":{},
+        "monster souls":0,
+        "preview monster":None,
         # "engaged monster":{}, # this is for the engaged monsters that are targetting and attacking the user
-        "hunt loop":False, # if this is False then hunting loop is stopped - else hunting loop should be continued
+        "monster loop":False, # if this is False then hunting loop is stopped - else hunting loop should be continued
         "total monsters defeated":0,
         "trophies":0,
-        "previous moves":[] # clear this after every monster fight
+        "previous moves":[], # clear this after every monster fight
+        "in attack":False
     }
 
     mines = { # currently users are default given a mineshaft - later on you have to buy the mineshaft, and you have to be a certain level on xp
@@ -504,12 +572,18 @@ async def start(ctx:commands.Context):
         }
     }
 
+    # for more information on pets, check pets.py and README.md
     pet = {
         "_id":user.id,
         "shards":0,
-        "normal pets":{},
-        "mythical pets":{},
-        "legendary pets":{},
+        "pets":{
+            # "wolf":{
+            #     "heath":100,
+            #     "damage":5,
+            #     "attack name":"bit",
+            #     "attack time":0.5
+            # }
+        }
     }
 
     # important note, lcuk arrays here will just be for fractions. For example [1,4] would be 1 out of 4 chance of something happening.
@@ -535,7 +609,7 @@ async def start(ctx:commands.Context):
                 "value multipliers":{},
                 "wagon size":{},
                 "scam luck":0,
-                "damage reduce":{},
+                "protection":{},
                 "damage increase":{}
             },
             "passive":{
@@ -544,13 +618,13 @@ async def start(ctx:commands.Context):
                 "wagon size":{},
                 "healing":1,
                 "scam luck":0,
-                "damage reduce":{},
+                "protection":{},
                 "damage increase":{}
             }
             },
             "local potions":{
             "luck":{},
-            "damage reduce":{},
+            "protection":{},
             "damage increase":{},
             "value multipliers":{},
             "mining speed":{},
@@ -561,15 +635,9 @@ async def start(ctx:commands.Context):
             "all unused potions":{}
     }
 
-    chests = {
+    chests_data = {
         "_id":user.id,
-        "chests":{
-            "legendary":0,
-            "rare":0,
-            "epic":0,
-            "uncommon":0,
-            "common":0
-        },
+        "chests":[],
         "unclaimed shipments":{
             "hourly":False,
             "daily":False,
@@ -602,20 +670,48 @@ async def start(ctx:commands.Context):
         "queue":{}
     }
 
+    # TODO: spend some time just writing down all the quests a player can have    
     quests = {
         "_id":user.id,
-        "quests":{
-            '1':{
-                "name":'flip a coin 3 times',
-                "limit":20,
-                "commands with quest":[
-                'coinflip'
-                ],
-                "amount required":3,
-                "progress":0
+        "side":{
+            "fight":{},
+            "item":{},
+            "location":{}
+        },
+        "main":{
+            "fight":{
+                # add and delete keys that show fight quests that need the player to fight a certain monster
+                
+                "mogosok":[
+                    {
+                        "name":"Kill the Mogosoks plaguing Thokim Town!",
+                        "amount":10,
+                        "progress":0,
+                        "required xp level":0,
+                        "reward":{"opal":3, "knight's sword":1, "xp":20},
+                        "required location":"thokim town"
+                    }
+                ]
+            },
+            "item":[
+                # add and delete keys that show item quests that need the player to find and get a certain item
+                {
+                    "quest name":"Get 10 apples for Henry.",
+                    "item":"apple",
+                    "required xp level":0,
+                    "amount":10,
+                    "progress":0,
+                    "reward":{"emerald":2},
+                    "required location":"thokim town"
                 }
-            }
-        }
+            ]
+        },
+        "daily":{},
+        "weekly":{},
+
+        # TODO: create documentation for all quests in the game
+        "focused quest":None
+    }
 
     async def tutorial():
         """This tutorial should first, give the user a weapon and tell user about the game."""
@@ -691,13 +787,15 @@ async def start(ctx:commands.Context):
             db.vault.insert_one(vault)
             db.monsters.insert_one(monsters)
             db.boosts.insert_one(boosts)
-            db.chests.insert_one(chests)
+            db.chests.insert_one(chests_data)
             db.farm.insert_one(farm)
             db.special_commands.insert_one(special_commands)
             db.duration.insert_one(duration)
             db.falcon_duration.insert_one(falcon_duration)
             db.quests.insert_one(quests)
+            db.location.insert_one(location)
             db.coliseum.insert_one(coliseum)
+            db.adventure_hub.insert_one(adventure_hub)
         
         def setUserAccountInDatabase():
             """This sets the user's account in the dictionary that contains all the game information"""
@@ -714,12 +812,14 @@ async def start(ctx:commands.Context):
             immediate_monsters_data = deepcopy(monsters)
             immediate_pet_data = deepcopy(pet)
             immediate_boosts_data = deepcopy(boosts)
-            immediate_chests_data = deepcopy(chests)
+            immediate_chests_data = deepcopy(chests_data)
             # immediate_farm_data = deepcopy(farm)
             immediate_special_commands_data = deepcopy(special_commands)
             immediate_duration_data = deepcopy(duration)
             immediate_falcon_duration_data = deepcopy(falcon_duration)
             immediate_quests_data = deepcopy(quests)
+            immediate_location_data = deepcopy(location)
+            immediate_adventure_hub_data = deepcopy(adventure_hub)
 
             del immediate_game_data["date registered"]
 
@@ -727,6 +827,7 @@ async def start(ctx:commands.Context):
             data = {
                 "game":immediate_game_data,
                 "monsters":immediate_monsters_data,
+                "location":immediate_location_data,
                 "healthpoints":immediate_hp_data,
                 "backpack":immediate_backpack_data,
                 "armor":immediate_armor_data,
@@ -739,117 +840,157 @@ async def start(ctx:commands.Context):
                 "special commands":immediate_special_commands_data,
                 "duration":immediate_duration_data,
                 "falcon duration":immediate_falcon_duration_data,
-                "quests":immediate_quests_data
+                "quests":immediate_quests_data,
+                "adventure hub":immediate_adventure_hub_data
             }
 
             Database.addUser(user, data) # sets the user's information in the database
         
         insertUserAccountInMongoDB()
         setUserAccountInDatabase()
-
+        
         user_data = Database.getStorageData(user)
 
-        async def giveStick():
-            """Give the player a stick."""
+        await ctx.send("Basic tutorial **(finish and refine this)**")
 
-            walk_to_outside_em = Embed(
-                description="Arrow walkeS outside of the temple, getting fresh air after a decade of sleeping in the Temple of Power..."
-            )
+        chest_type = "wooden"
 
-            await ctx.send(embed=walk_to_outside_em)
+        beginning_chest = {
+            "type":"wooden",
+            "items":{"opal":2, "stick":1}
+        }
 
-            await asyncio.sleep(3)
+        await ChestsTool.spawnChest(ctx, chest_type, beginning_chest)
 
-            give_stick_em = Embed(
-                description="Arrow found a stick!"
-            )
+        chests = user_data["chests"]
 
-            give_stick_em.set_image(url='https://static.wikia.nocookie.net/zelda_gamepedia_en/images/4/4f/BotW_Tree_Branch_Model.png/revision/latest?cb=20201117203720')
-
-            take_stick_em = Embed(
-                description='Do you want to take the stick? React with <:regional_indicator_y:878106223839420436> or <:regional_indicator_n:878106367926349824>'
-            )
-            
-            await ctx.send(embed=give_stick_em)
-            stick_msg: Message = await ctx.send(embed=take_stick_em)
-
-            await stick_msg.add_reaction('🇾')
-            await stick_msg.add_reaction('🇳')
-            
-            reaction = None
-
-            try:
-                def check(reaction:discord.Reaction, _user:discord.User):
-                    return _user.id == user.id and str(reaction.emoji) in ['🇾','🇳'] and reaction.message.id == stick_msg.id
-            
-                reaction: discord.Reaction = await client.wait_for('reaction_add',check=check,timeout=30.0) # this specific wait for returns (reaction, user), but we only need the reaction object so we take the first element of the tuple, which is the reaction
-
-                reaction = reaction[0]
-            
-            except asyncio.TimeoutError:
-                await ctx.send('You have timed out, you are not taking the stick.')
-                return
-
-            # code here runs if the user has decided to take the stick, indicating that by reacting with y
-            if str(reaction.emoji) == '🇾': # this means the user wants to take the stick
-                await tools.addEquipment(ctx, user, "stick", "melee")
-
-                # damage = stick_stats["damage"]
-                # durability = stick_stats["durability"]
-                # attack_time = stick_stats["attack time"]
-                # energy_taken = stick_stats["energy taken"]
-
-                # bp["weapons"]["weapons"]["stick"] = {
-                #     "name":"stick",
-                #     "damage":stick_damage,
-                #     "durability":stick_durability,
-                #     "attack time":3,
-                #     "energy taken":5
-                # }
-                
-                # _em = discord.Embed(description='Arrow picked the stick up')
-
-                # _em.add_field(
-                #     name="Stick Attributes",
-                #     value=f"""
-                #         `Attack Power`: `{stick_damage}`
-                #         `Durability`: `{stick_durability}`
-                #         `Attack time`: `3 seconds`
-                #     """
-                # )
-
-                # _em.add_field(name='\u200b',value='Optional: set the name of your weapon with `.rename <weapon_name> <new_weapon_name>`')
-
-                # await ctx.send(embed=_em)
-
-                bp["weapons"]["equipped weapon"] = "stick"
-
-                # send a monster to attack user
-            
-            else: # user decided to not take the stick
-                em = discord.Embed(
-                    description='You have decided to not take the stick.',
-                    color=tools.lime
-                )
-
-            em = Embed(
-                description="Arrow was ambushed by a monster! A Mogosok just appeared in front of Arrow! Fight back!"
-            )
-
-            em.set_footer(text='')
-            
-            await ctx.send(embed=em)
-
-            # start the attack on the user
-            monster_data = await tools.spawnMonster(ctx, client, user, "mogosok", 1, block=True)
-
-            await tools.startMonsterAttackLoop(ctx, user, 1, monster_data, client)
+        def check():    
+            return len(chests["chests"]) == 0
         
-        # await giveStick()
+        await tools.lockGame(user, check) # locks game until the chest is open
+
+        await asyncio.sleep(1) # just so all the messages from .open will finish sending.
+
+        challenge_name = "Fight a Mogosok!"
+        
+        challenging_monsters = [{"mogosok":1}] # monster_name: monster_rank
+        
+        await ChallengesTool.startConfinedFightChallenge(challenge_name, ctx, challenging_monsters)
+
+        # response 1 and 2 are the same, make variable to reduce lines of code
+        data = {
+            "sentence":"Can I ask you, what were you doing in the Temple of Power? This place is sacred to the fallen hero.",
+            "responses":{
+                1:"I'm not sure, I just woke up in here..."
+            },
+            1:{
+                "sentence":"Whoa... What's your name kiddo?",
+                "responses":{
+                    1:"I think... It's Arrow?"
+                },
+                1:{
+                    "sentence":"..."
+                }
+            }
+        }
+
+        dialogue = {
+            "sentence":"Hey kiddo. Good job. I saw you from behind.",
+            "responses":{
+                1:"Thanks.",
+                2:"No sweat."
+            },
+            1:data,
+            2:data
+        }
+        
+        await tools.dialogue("Old man", client, ctx, dialogue)
+
+        await ctx.send('Journey in this world, defeat monsters, fight for your lives, ... add a shit ton of descriptives in here about the game...\n\nWelcome to the game! Use `.help` for more information on commands, and use `.gameplay` to find the basic way of how to play this game.')
+
+        dialogue = {
+            "sentence":"Hey, young man. Arrow, you said?",
+            "responses":{
+                1:"Yes, I think my name is Arrow."
+            },
+            1:{
+                "sentence":"Hmm...",
+                "responses":{
+                    1:"Is there something in my hair?"
+                },
+                1:{
+                    "sentence":"Now listen here. I'm not sure who you are, where you are from, what you are doing here, and how you defeated that monster so easily, but there's one thing I **do** know. You are extremely unprepared for the world outside. I trust you know who Neorjh is?",
+                    "responses":{
+                        1:"Of course.",
+                        2:"Who?"
+                    },
+                    1:{
+                        "sentence":"Then you know the danger right outside this door, because Neorjh killed nearly everyone on Thokim, and the 4 other realms as well. This place is a sanctuary for travelers. You were in the back, where no one is allowed, but in the front, travelers gather here in the thousands to pray to the goddess. Some pray for luck, some pray for a better life, some pray for their family to come back. This is why you always want to keep a `monster sensor` with you at all times.\nMonster sensors are crucial to your survival. Monsters will appear out of nowhere and surprise you, and if you know nothing about the monster, it is inevitable that you die. A monster sensor will alert you that a monster is nearby, AND it can also show you everything about the monster, from the weapon it is holding to it's max health. i can give you my own monster sensor, but...",
+                        "responses":{
+                            1:"Yeah?"
+                        },
+                        1:{
+                            "sentence":"I'm going to need payment! I'm not just going to give away my precious monster sensor!",
+                            "responses":{
+                                1:"Well, what kind of payment are we looking at?"
+                            },
+                            1:{
+                                "sentence":"There have been some monsters roaming around the `Temple of Power` for a long time, and I haven't found someone good enough to clear all 5 monster camps surrounding us. Clear those monster camps for me, and I promise you this `monster sensor` is yours. Oh, and I want the opals in the monster camp chests too. Once you cleared those monster camps, come back inside via `.questlocation` (`.ql` for short) to travel to the exact place the current focused quest wants you to be at."
+                            }
+                        },
+                    },
+                    2:{
+                        "sentence":"Oh my goodness. Have you been living under a rock for the past 50 years??! Neorjh killed nearly everyone on Thokim, and the 4 other realms as well. The few survivors huddled in a cave, only going outside during the darkest part of the night in order to sneak past monsters. Yet it coincides that the monsters are the strongest in the night, and many died. Those that survived managed to bring down the sheer amount of monsters from Neorjh's upbringing, and created a livable environment for humans to repopulate. Now, we are happy, but monsters still roam around. And you, Arrow, are completely exposed. You have nothing but a stick and some pants! What you need is a `monster sensor`. A monster sensor will alert you that a monster is nearby, AND it can also show you everything about the monster, from the weapon it is holding to it's max health. i can give you my own monster sensor, but...",
+                        "responses":{
+                            1:"Yeah?"
+                        },
+                        1:{
+                            "sentence":"I'm going to need payment! I'm not just going to give away my precious monster sensor!",
+                            "responses":{
+                                1:"Well, what kind of payment are we looking at?"
+                            },
+                            1:{
+                                "sentence":"There have been some monsters roaming around the `Temple of Power` for a long time, and I haven't found someone good enough to clear all 5 monster camps surrounding us. Clear those monster camps for me, and I promise you this `monster sensor` is yours. Oh, and I want the opals in the monster camp chests too. Once you cleared those monster camps, come back inside via `.questlocation` (`.ql` for short) to travel to the exact place the current focused quest wants you to be at."
+                            }
+                        },
+                    }
+                }
+            }
+        }
+
+        await tools.dialogue("Old Man", client, ctx, dialogue)
+
+        quest_name = "Clear the 5 Mogosok Camps!"
+        quest_type = "main"
+        monsters_in_camp = [
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            },
+            {
+                "name":"mogosok",
+                "rank":1
+            }
+        ]
+        
+        for i in range(5):
+            await QuestsTool.setFightQuestMonsterCamp(ctx, quest_name, quest_type, monsters_in_camp, session=True)
     
     await tutorial()
 
-    await ctx.send(f'{user.mention} made your account. ')
+    await ctx.send(f'{user.mention} made your account.')
 
 @client.command()
 async def clear(ctx: commands.Context):
@@ -864,7 +1005,7 @@ async def clear(ctx: commands.Context):
     await ctx.send('All user accounts deleted.')
 
 @client.command()
-async def clear1(ctx):
+async def clear1(ctx: commands.Context):
     names = db.list_collection_names()
     user: discord.User = ctx.author
     for collection in names:
@@ -876,6 +1017,7 @@ async def clear1(ctx):
 for folder in os.listdir('./cogs'):
     if folder == '__pychache__':
         pass
+
     else:
         for file in os.listdir(f'./cogs/{folder}'):
             if file.endswith('.py'):
@@ -887,6 +1029,8 @@ def run():
 
 def main():
     # try:
+        os.system('cls')
+
         run()
     # except:
         print('Bot has crashed, retrying...')

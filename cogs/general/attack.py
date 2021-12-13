@@ -3,9 +3,8 @@ import discord,random
 from discord.ext import commands
 from dev.tools import tools
 from dev.db  import Database
-from cogs.thokim.falcon import hunt
 from dev.map import Map
-from dev.monster_tools import monster_tools
+from dev.MonsterTools import MonsterTools
 
 class Attack(commands.Cog):
     def __init__(self, client: commands.Bot):
@@ -15,6 +14,7 @@ class Attack(commands.Cog):
     async def on_ready(self):
         print('Attack extension loaded. ')
   
+    @commands.check(tools.checkPLayerNotConfined)
     @commands.command()
     async def punch(self,ctx:commands.Context,enemy):
         user = ctx.author
@@ -51,45 +51,66 @@ class Attack(commands.Cog):
 
         # refence dev.tools for more information on the code below
 
-        msg = monster_tools.all_quest_and_chest_actions(ctx,'coinflip',user)
+        msg = tools.all_quest_and_chest_actions(ctx, 'coinflip', user)
 
         await ctx.send(msg)
 
 
     @commands.command(aliases=['select'])
-    async def equip(self,ctx:commands.Context,wpn_name=None):
-        if wpn_name == None:
-            await ctx.send('No argument for `weapon` - check your backpack with `.bp` to see all your weapons.')
+    async def equip(self, ctx:commands.Context, wpn_id: int = None):
+        if wpn_id == None:
+            await tools.NoArgumentGiven(ctx, ['wpn_id'])
             return
-
-        user = ctx.author
+        
+        user: discord.User = ctx.author
         
         user_data = Database.Storages[user.id]
 
         bp = user_data["backpack"]
 
-        if bp["equipped weapon"] == wpn_name:
-            ctx.message.add_reaction('<:x:883531508198035456>')
-            return
+        i = 1
+
+        wpn_id = int(wpn_id)
 
         for wpn in bp["weapons"]["weapons"]:
-            if bp["weapons"]["weapons"][wpn]["name"] == wpn_name:
-                # update in the user's document in backpack collection with equipped weapon as the weapon argument
+            if i == wpn_id:
+                bp["weapons"]["equipped weapon"] = wpn
 
-                user_data["backpack"]["equipped weapon"] = wpn_name
-        
-                em = discord.Embed(
-                    description=f'You have equipped `{wpn_name}`'
-                )
-
-                await ctx.send(embed=em)
+                await ctx.send(f'You have equipped **{bp["weapons"]["weapons"][wpn]["name"]}**')
 
                 return
+            
+            i += 1
         
         # if code reaches here then the bot has not found a weapon with the given name
         await ctx.send(embed=discord.Embed(
-            description=f'You do not have weapon of name `{wpn_name}`'
+            description=f'You do not have a weapon with id `{wpn_id}` - please check your weapons with `.weapons`.'
         ))
+    
+    @commands.command()
+    async def switch(self, ctx: commands.Context):
+        """
+        Switches the weapon to the offhand weapon in the player's other hand. Tells the player that they do not have a weapon on the off hand if True.
+        """
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        message: discord.Message = ctx.message
+
+        bp = user_data["backpack"]
+
+        offhand_weapon: str = bp["weapons"]["offhand weapon"]
+        equipped_weapon: str = bp["weapons"]["equipped weapon"]
+
+        if offhand_weapon == None:
+            await message.add_reaction('❌')
+
+            return
+        
+        bp["weapons"]["offhand weapon"] = equipped_weapon
+        bp["weapons"]["equipped weapon"] = offhand_weapon
+        
+        await ctx.reply(f'Switched weapons - equipped weapon is now `{offhand_weapon}`, and offhand weapon is now `{equipped_weapon}`')
     
     @commands.command(aliases=['nwpn'])
     async def rename(self, ctx: commands.Context, prev_wpn_name: str, wpn_name: str):
@@ -318,10 +339,8 @@ class Attack(commands.Cog):
             radius = 30
 
             current_cord = spawnCoord
-            
-            loop = True
 
-            while loop: # this is for the monster loop
+            while monsters["loop"]: # if this gets set to false via end command, loop should stop
                 aloneOrMonsterCamp = random.randint(1, 50)
 
                 if aloneOrMonsterCamp == 50: # RNG decides that the user can fight a whole monster camp!
@@ -330,16 +349,11 @@ class Attack(commands.Cog):
                 else: # RNG says that the user can only fight a singular monster
                     gdata = user_data["game"]
 
-                    base_monster, monster_rank = monster_tools.getMonsterFromPlayerLevel(gdata["level"])
+                    base_monster, monster_rank = MonsterTools.getMonsterFromPlayerLevel(gdata["level"])
 
-                    monster_data = await monster_tools.spawnMonster(ctx, self.client, user, base_monster, monster_rank)
+                    monster_data = await MonsterTools.spawnMonster(ctx, user, base_monster, monster_rank)
 
                     # now we can start accepting user commands
-
-                    monsters["preview"] = monster_data
-                
-            else: # user did not find a monster. i can choose to put something here if i want
-                pass
         
             while True: # while loop for ONE of the next coords
                 x = random.randint(current_cord[0] - radius, current_cord[0] + radius)
@@ -351,14 +365,26 @@ class Attack(commands.Cog):
 
                 if abs(x - current_cord[0]) + abs(y - current_cord[1]) <= radius:
                     current_cord = (x, y)
-                    loop = False
                     break
         
         elif target == 'prey':
             """Start prey loop"""
-    
-        else: # hunt with falcon
-            await hunt(ctx)
+        
+        # TODO: change this so all the hunting is not done in one command
+        
+    @commands.command()
+    async def end(self, ctx: commands.Context):
+        """Ends the hunting loop that the player is in."""
+
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+        monsters: dict = user_data["monsters"]
+
+        if monsters["loop"]:
+            monsters["loop"] = False
+        
+        else:
+            await ctx.reply('You are currently not fighting any monster.', meniton_author=False)
 
 def setup(client: commands.Bot):
     client.add_cog(Attack(client))

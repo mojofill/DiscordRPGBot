@@ -20,7 +20,7 @@ class Donate(commands.Cog):
     async def knight(self,ctx):
         user = ctx.author
 
-        em = discord.Embed(color=tools.lime)
+        em = discord.Embed(color=discord.Color.dark_green())
 
         # do stuff here
 

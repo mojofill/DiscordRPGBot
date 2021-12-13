@@ -32,9 +32,17 @@ for user_data in gdata:
         def get_monsters():
             monsters_dict = db.monsters.find_one({"_id":user_id})
 
-            monsters_dict["engaged monster"] = None
+            try:
+                del monsters_dict["engaged monster"]
+            
+            except KeyError:
+                pass
+        
+            except:
+                raise
+
             monsters_dict["preview monster"] = None
-            monsters_dict["hunt loop"] = False
+            monsters_dict["monster loop"] = False
             
             user_stored_data["monsters"] = monsters_dict
         

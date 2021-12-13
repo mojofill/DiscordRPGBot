@@ -1,4 +1,8 @@
-import discord,datetime,asyncio
+import discord
+import datetime
+import asyncio
+import sys
+import os
 from discord.ext import commands
 from dev.db import Database
 from dev.tools import tools
@@ -6,7 +10,7 @@ from dev.api import db
 from threading import Thread
 
 class General(commands.Cog):
-    def __init__(self,client):
+    def __init__(self, client: commands.Bot):
         self.client = client
 
     @commands.Cog.listener()
@@ -19,7 +23,7 @@ class General(commands.Cog):
         # right here check if the aspect is part of the acceptable aspects
         user = ctx.author
 
-        em = discord.Embed(title='',color=tools.lime,timestamp=datetime.datetime.utcnow())
+        em = discord.Embed(title='',color=discord.Color.dark_green(),timestamp=datetime.datetime.utcnow())
 
         em.set_footer(text=f'Requested by {user}',icon_url=user.avatar_url)
 
@@ -135,7 +139,7 @@ class General(commands.Cog):
     @commands.command(name='commands')
     async def command(self,ctx):
         user = ctx.author
-        em = discord.Embed(color=tools.lime,timestamp=datetime.datetime.utcnow(),title="Commands")
+        em = discord.Embed(color=discord.Color.dark_green(),timestamp=datetime.datetime.utcnow(),title="Commands")
         
         em.set_author(name=self.client.user,icon_url=self.client.user.avatar_url)
         em.set_footer(text=f'Requested by {user}',icon_url=user.avatar_url)
@@ -214,7 +218,7 @@ class General(commands.Cog):
 
         em.add_field(name="Game",value=f"""
         Level: **{gdata["level"]}**
-        XP: **{gdata["experience"]}**
+        XP: **{gdata["xp"]}**
         Status: **{gdata["status"].title()}**
         Location: **{gdata["location"].title()}**
         """)
@@ -271,7 +275,7 @@ class General(commands.Cog):
         bp = user_data["backpack"]
 
         # remember the implement the method that rafael suggested, 
-        em = discord.Embed(color=tools.lime,title="Backpack")
+        em = discord.Embed(color=discord.Color.dark_green(),title="Backpack")
         em.set_author(name=user,icon_url=user.avatar_url)
 
         em.add_field(name="Currency",value=f"""
@@ -285,20 +289,148 @@ class General(commands.Cog):
 
         for weapon in bp["weapons"]["weapons"]:
             msg += f"""
-                {weapon.title()}
-                Health: {bp["weapons"]["weapons"][weapon]["durability"]}
+                **TYPE**: `{weapon.title()}`
+                **DURABILITY**: `{bp["weapons"]["weapons"][weapon]["durability"]}`
             """
         
         if msg == '':
             msg = 'No weapons in `backpack`.'
+        
+        msg += f'\n**SELECTED WEAPON**: `{bp["weapons"]["equipped weapon"]}`'
+
+        em.add_field(name='\u200b',value=msg)
 
         await ctx.send(embed=em)
 
-        await ctx.send(bp["weapons"]["weapons"])
+    @commands.command(aliases=['g'])
+    async def grab(self, ctx: commands.Context):
+        """Grabs ALL items in the player's backpack."""
+
+        user: discord.User = ctx.author
+
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        total = 0
+        
+        for i in bp["grabbable items"]:
+            total += len(bp["grabbable items"][i])
+        
+        if total == 0:
+            await ctx.reply("Nothing to grab.", mention_author=False)
+            return
+        
+        await tools.addEquipments(ctx, bp["grabbable items"]["weapons"])
+        await tools.addEquipments(ctx, bp["grabbable items"]["bows"])
+        await tools.addLoot(ctx, bp["grabbable items"]["loot"])
+        await tools.addRawFood(ctx, bp["grabbable items"]["food"])
+        await tools.addValuables(ctx, bp["grabbable items"]["valuables"])
+        await tools.addArmors(ctx, bp["grabbable items"]["armor"])
+
+        bp["grabbable items"] = {"weapons":{}, "bows":{}, "loot":{}, "food":{}, "valuables":{}, "armor":{}}
+    
+    @commands.command(aliases=['gp'])
+    async def gameplay(self, ctx: commands.Context):
+        """
+        Tells the player how to (basically) play the game. This is a good place to organize my thoughts, and think about how to actually play the game.
+        """
+
+        em = discord.Embed(
+            title='Basic Gameplay',
+            description='Welcome to the community. (Just write random introduction shit here)',
+            color=discord.Color.gold()
+        )
+
+        em.add_field(
+            name="Movement",
+            value=
+            """
+            To move around to different places, use `.walk <location>`. Certain commands are unable to be used unless the player is at a certain location. You can look at your unlocked locations using `.locations`. More on `locations` command with `.help locations`.
+
+            (If you do not wish to use `.walk` to every place, simply do `.autowalk`. RPG Bot will then automatically move you to the place you need to go, and gives a warning if you are at low enery.)
+            """
+        )
+
+        em.add_field(
+            name="Quests",
+            value=
+            """
+            Quests are one of the most important aspects of this game. Everyday, there will be something new in your quests page. Access your quests with `quests [quest type|quest index]`. You can pass in `quest type` to look only at certain parts of your quests, for example `.quests main`, or `.quests daily` (you could also just enter `.daily`).
+
+            Every time you finish a quest, you will get rewarded at `Adventurer's Hub` (located in the Thokim Town). Use `.collect` there to collect your rewards.
+            """,
+            inline=False
+        )
+
+        await ctx.send(embed=em)
+        
+    @commands.command(aliases=['c'])
+    async def cook(self, ctx: commands.Context):
+        """Cooks food for the player"""
+    
+    @commands.command()
+    async def add(self, ctx: commands.Context, *item):
+        """Adds items to the cooking pot if the player is near a cooking pot."""
+
+    @commands.command()
+    async def eat(self, ctx: commands.Context, *items):
+        pass
+
+    @commands.command()
+    async def eatmeal(self, ctx: commands.Context, meal):
+        await ctx.send()
+    
+    @commands.command()
+    async def weapons(self, ctx: commands.Context):
+        """Sends a message on the player's current weapons"""
+
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        weapons_str = [f'**{user}** Here are your weapons. Use `.equip <number>` to equip the given weapon at index `number`.\n']
+
+        index = 1
+
+        for wpn in bp["weapons"]["weapons"]:
+            weapons_str.append(f'**{index}**: `{wpn}`. **DURABILITY**: {bp["weapons"]["weapons"][wpn]["durability"]}, **DAMAGE**: `{bp["weapons"]["weapons"][wpn]["damage"]}`')
+
+            index += 1
+        
+        weapons_str = '\n'.join(weapons_str)
+
+        # TODO maybe change to discord.Embed, not str
+
+        await ctx.send(weapons_str)
+    
+    @commands.command()
+    async def bows(self, ctx: commands.Context):
+        
+        user: discord.User = ctx.author
+        user_data = Database.getStorageData(user)
+
+        bp = user_data["backpack"]
+
+        bows_str = [f'**{user}** Here are your bow. Use `.equipbow <number>` to equip the given bow at index `number`.\n']
+
+        index = 1
+
+        for wpn in bp["bows"]["bows"]:
+            bows_str.append(f'**{index}**: `{wpn}`. **DURABILITY**: {bp["bows"]["bows"][wpn]["durability"]}, **DAMAGE**: `{bp["bows"]["bows"][wpn]["damage"]}`')
+
+            index += 1
+        
+        bows_str = '\n'.join(bows_str)
+
+        # TODO maybe change to discord.Embed, not str
+
+        await ctx.send(bows_str)
 
     @commands.command(aliases=['bot'])
     async def about(self,ctx):
-        em = discord.Embed(title='About DOLLARS',color=discord.Color.green())
+        em = discord.Embed(title='About DOLLARS',color=discord.Color.dark_green())
         em.set_author(name=self.client.user,icon_url = self.client.user.avatar_url)
         em.set_thumbnail(url=self.client.user.avatar_url)
         em.add_field(name='Version',value='1.0.0\n',inline=False)
@@ -308,12 +440,18 @@ class General(commands.Cog):
         em.add_field(name='Developer',value='bazingun#4610',inline=False)
         em.add_field(name='Active users: 1',value='\u200b',inline=False)
         em.add_field(name='Gameplay',value='For more information on game play, do `.guide`.',inline = False)
-
         
         em.set_footer(text=f'Requested by {ctx.author}',icon_url=ctx.author.avatar_url)
 
         await ctx.send(embed=em)
 
+    @commands.command(aliases=['quit'])
+    async def stop(self, ctx: commands.Context):
+        """TODO: DELETE THIS WHEN PUBLISHING THE BOT"""
+        await ctx.reply('Stopping bot...')
+
+        os.system('cls')
+        sys.exit()
 
     @commands.command()
     async def travelby(self,ctx,mode):  
@@ -326,42 +464,31 @@ class General(commands.Cog):
         db.game.update_one({"_id":user.id},{"$set":{"default transport":mode}})
 
         await ctx.send(f'{user.mention} Changed your default transport to {mode}.')
-    
+
     @commands.command()
-    async def walk(self,ctx,location):
-        locations_to_realm = {
-            "thokim":['mineshaft','home','jungle','mountain','']
-        }
-
-        realm = None
-
-        for Realm in locations_to_realm:
-            if location in locations_to_realm[Realm]:
-                realm = Realm
-                break
+    @commands.check(tools.checkPLayerNotConfined)
+    @commands.check(tools.checkPlayerGameNotLocked)
+    async def walk(self, ctx: commands.Context, location):
+        try:
+            await tools.travel(ctx, location)
         
-        if realm == None:
-            await ctx.send('Invalid location argument. Check `.locations` to see all the locations in each realm.')
-            return
+        except tools.PlayerConfined:
+            pass # perhaps dm the user that they are confined? Think on it later
 
-        user = ctx.author
-        gdata = db.game.find_one({"_id":user.id})
-                
-        if gdata["realm"] != realm:
-            await ctx.send(f'You are not in {realm} yet, which is where {location} is. Check `.locations` to see all the locations in each realm.')
-            return
-        
-        if gdata["location"] not in locations_to_realm[realm]:
-            await ctx.send("{location} is not in {realm}. Check `.locations` to see all the locations in each realm.")
-            return
-        
-        await ctx.send(f"Starting to walk to {location}..")
-        
-        await asyncio.sleep(gdata["walk time"])
+        except tools.PlayerGameLocked:
+            pass # same thing as tools.PlayerConfined exception comment
 
-        db.game.update_one({"_id":user.id},{"$set":{"location":location}})
+    @walk.error
+    async def walk_error(ctx: commands.Context, error: Exception):
+        if isinstance(error, commands.CheckFailure):
+            user: discord.User = ctx.author
+            user_data = Database.getStorageData(user)
+            gdata = user_data
+            
+            await user.send(f'Cannot use `.walk` at `{gdata["location"]}`.')
 
-        await ctx.send(f'{user.mention} you arrived at {location} by walking.')
+        else:
+            raise error
   
 def setup(client):
   client.add_cog(General(client))

@@ -13,28 +13,29 @@ class Test(commands.Cog):
     
     @commands.command()
     async def test(self, ctx: commands.Context):
-        user = ctx.author
-
-        save = None
-
-        def check(reaction: discord.Reaction, _user: discord.User):
-            nonlocal save
-
-            save = reaction.emoji
-
-            return True
-
-        m: discord.Message = await ctx.send('React to this message with 👍.')
-
-        await m.add_reaction('👍')
+        dialogue_data = {
+            "sentence":"Yo what are you doing here",
+            "responses":{
+                1:"nothing particular",
+                2:"peeing"
+            },
+            1:{
+                "sentence":"no, i think youre up to no good",
+                "responses":{
+                    1:"no???"
+                },
+                1:{
+                    "sentence":"Ah hah! I see your piss right there, you nasty ass."
+                    # no responses, end dialogue
+                }
+            },
+            2:{
+                "sentence":"BOI GET YOUR NASTY ASS MF OUT OF MY HOUSE AND PISS SOMEWHERE ELSE",
+                # no responses, end dialogue
+            }
+        }
         
-        await self.client.wait_for("reaction_add", check=check)
-
-        await ctx.send(save)
-
-    @commands.command(aliases=['print'])
-    async def _print(self, ctx: commands.Context):
-        await ctx.send('**TEST MESSAGE**')
+        await tools.dialogue("Your Mom", self.client, ctx, dialogue_data)
 
 def setup(client: commands.Bot):
     client.add_cog(Test(client))

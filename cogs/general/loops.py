@@ -1,5 +1,6 @@
 import discord,random,json,threading,time
 from discord.ext import commands,tasks
+from dev.db import Database
 from dev.tools import tools
 from dev.api import db
 
@@ -11,7 +12,7 @@ class Loops(commands.Cog):
     async def on_ready(self):
         # self.add_items.start()
         # self.add_mining_speed.start()
-        self.change_daily_quests.start()
+        # self.change_daily_quests.start()
         self.hourly_shipments.start()
         self.daily_shipments.start()
         self.weekly_shipments.start()
@@ -181,24 +182,21 @@ class Loops(commands.Cog):
 
     @tasks.loop(seconds=86400) # 86400 seconds in a day
     async def change_daily_quests(self):
-        quests_ = db.quests
-
-        player_quests = quests_.find({})
-
-        for player in player_quests:
+        for user_id in Database.Storages:
+            print(user_id)
             def run():
-                user_id = player["_id"]
+                nonlocal user_id
 
-                all_quest_ids = list(player["quests"].keys())
+                user_data = Database.Storages[user_id]
 
-                for quest_id in all_quest_ids:
-                    del player["quests"][quest_id]
-                
-                quests_.update_one({"_id":user_id},{"$set":{"quests":player["quests"]}})
+                quests = user_data["quests"]
 
-                quests_to_give = random.randint(3,5)
+                user_id = quests["_id"]
 
-                quests = quests_.find_one({"_id":user_id})
+                for quest_id in quests["daily"]:
+                    del quests["daily"][quest_id]
+
+                quests_to_give = random.randint(3,5) # random amount of quests to give to the player
 
                 quest_choices_name = list(self.quest_choices.keys())
 
@@ -234,24 +232,22 @@ class Loops(commands.Cog):
                     
                     while True:
                     # count += 1
-                        new_quest_id = random.randint(1,choice_range)
+                        new_quest_id = random.randint(1, choice_range)
 
                         if new_quest_id not in all_quest_ids:
                             break
                     
-                    # else:
-                    #   if count == choice_range:
-                    #     choice_range += 10
+                        # else:
+                        #   if count == choice_range:
+                        #     choice_range += 10
 
                     quests["quests"][str(new_quest_id)] = {
                         "name":quest_name,
                         "difficulty":difficulty,
-                        "amount required":__value__,
+                        "amount":__value__,
                         "commands with quest":quest["commands with quest"],
                         "progress":0
                     }
-
-                quests_.update_one({"_id":user_id},{"$set":{"quests":quests["quests"]}})
 
             threading.Thread(target=run).start()
 
