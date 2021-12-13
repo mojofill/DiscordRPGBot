@@ -378,7 +378,7 @@ class _monster_tools():
 
                 return False
             
-            def getElementalEquipmentType(name: str):
+            def getElementalEquipmentType(name: str) -> str:
                 elemental_weapon_types = {
                     # melee
                         'lightning sword':'lightning',

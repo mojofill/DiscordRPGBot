@@ -29,9 +29,7 @@ from dev.chests import ChestsTool
 from dev.challenges import ChallengesTool
 from discord.ext import commands, tasks
 from discord import Embed
-from discord_slash import SlashCommand, SlashContext, ButtonStyle
 from dev.db import Database
-from discord_slash.utils.manage_components import create_button, create_actionrow
 
 load_dotenv()
 
@@ -1027,6 +1025,7 @@ for folder in os.listdir('./cogs'):
 
 def run():
     client.run(os.getenv('TOKEN'))
+    # test commit - will this appear?
 
 def main():
     # try:
